@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/QRSnip.Core/QRSnip.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/QRSnip.Core.Tests/QRSnip.Core.Tests.csproj" />
+  </Folder>
+</Solution>

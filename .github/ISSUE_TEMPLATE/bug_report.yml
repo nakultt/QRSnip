@@ -1,0 +1,42 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: QRSnip version
+      description: Settings › About
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: Installed from
+      options: [Microsoft Store, Portable zip, Built from source]
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: "Windows 11 24H2"
+  - type: textarea
+    id: displays
+    attributes:
+      label: Displays
+      description: Number of monitors and their scaling (e.g. 1920x1080 at 150% + 1920x1080 at 100%).
+  - type: textarea
+    id: log
+    attributes:
+      label: Crash log
+      description: If QRSnip crashed, paste %LOCALAPPDATA%\QRSnip\crash.log here.
+      render: text

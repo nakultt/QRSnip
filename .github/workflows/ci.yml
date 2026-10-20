@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Test core library
+        run: dotnet test --project tests/QRSnip.Core.Tests -c Release
+
+      - name: Build app (x64, ARM64)
+        run: |
+          dotnet build src/QRSnip/QRSnip.csproj -c Release -p:Platform=x64
+          dotnet build src/QRSnip/QRSnip.csproj -c Release -p:Platform=ARM64

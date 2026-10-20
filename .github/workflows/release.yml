@@ -1,0 +1,40 @@
+name: Release
+
+# Publishing a GitHub release builds the portable zips and the Store bundle
+# and attaches them to that release.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Test core library
+        run: dotnet test --project tests/QRSnip.Core.Tests -c Release
+
+      - name: Package
+        shell: pwsh
+        run: ./build/package.ps1 -Output artifacts
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: qrsnip-packages
+          path: artifacts/*
+
+      - name: Attach to release
+        if: github.event_name == 'release'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" (Get-ChildItem artifacts -File).FullName --clobber

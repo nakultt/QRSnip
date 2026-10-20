@@ -1,6 +1,9 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/QRSnip.Core/QRSnip.Core.csproj" />
+    <Project Path="src/QRSnip/QRSnip.csproj">
+      <Platform Project="x64" />
+    </Project>
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/QRSnip.Core.Tests/QRSnip.Core.Tests.csproj" />

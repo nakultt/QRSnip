@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="QRSnip.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:services="using:QRSnip.Services"
+    Title="QRSnip">
+
+    <Window.SystemBackdrop>
+        <MicaBackdrop />
+    </Window.SystemBackdrop>
+
+    <Grid x:Name="Root">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="48" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!--  Title bar  -->
+        <TitleBar x:Name="AppTitleBar" Title="QRSnip" BackRequested="OnBackRequested" IsBackButtonVisible="False">
+            <TitleBar.IconSource>
+                <ImageIconSource ImageSource="ms-appx:///Assets/AppLogo.png" />
+            </TitleBar.IconSource>
+        </TitleBar>
+
+        <!--  Home  -->
+        <Grid x:Name="HomePage" Grid.Row="1" Padding="20,4,20,12" RowSpacing="12">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Border Style="{StaticResource CardStyle}" Padding="24,28">
+                <StackPanel HorizontalAlignment="Center" Spacing="6">
+                    <Border Width="64" Height="64" Margin="0,0,0,10" HorizontalAlignment="Center" CornerRadius="16" Background="{ThemeResource AccentFillColorDefaultBrush}">
+                        <FontIcon FontSize="30" Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}" Glyph="&#xED14;" />
+                    </Border>
+                    <TextBlock HorizontalAlignment="Center" Style="{StaticResource SubtitleTextBlockStyle}" Text="Scan a QR code" />
+                    <TextBlock HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="Drag a box around any code on your screen." TextAlignment="Center" TextWrapping="Wrap" />
+                    <Button x:Name="ScanButton" Margin="0,14,0,0" Padding="20,8" HorizontalAlignment="Center" Click="OnScanClick" Style="{StaticResource AccentButtonStyle}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon FontSize="16" Glyph="&#xF406;" />
+                            <TextBlock Text="New scan" />
+                        </StackPanel>
+                    </Button>
+                    <StackPanel x:Name="HotkeyHint" Margin="0,8,0,0" HorizontalAlignment="Center" Orientation="Horizontal" Spacing="4" />
+                </StackPanel>
+            </Border>
+
+            <Grid Grid.Row="1" Margin="4,8,0,0">
+                <TextBlock VerticalAlignment="Center" Style="{StaticResource BodyStrongTextBlockStyle}" Text="Recent" />
+                <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8">
+                    <TextBlock x:Name="StatusText" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Style="{StaticResource CaptionTextBlockStyle}" />
+                    <HyperlinkButton x:Name="ClearButton" Padding="8,4" Click="OnClearClick" Content="Clear all" />
+                </StackPanel>
+            </Grid>
+
+            <ListView
+                x:Name="HistoryList"
+                Grid.Row="2"
+                Margin="-4,0"
+                IsItemClickEnabled="False"
+                SelectionMode="None">
+                <ListView.ItemContainerStyle>
+                    <Style BasedOn="{StaticResource DefaultListViewItemStyle}" TargetType="ListViewItem">
+                        <Setter Property="Padding" Value="4,0" />
+                        <Setter Property="Margin" Value="0,0,0,4" />
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                    </Style>
+                </ListView.ItemContainerStyle>
+                <ListView.ItemTemplate>
+                    <DataTemplate x:DataType="services:HistoryEntry">
+                        <Grid Padding="12,10" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" ColumnSpacing="12" CornerRadius="{StaticResource ControlCornerRadius}" ToolTipService.ToolTip="{x:Bind Text}">
+                            <Grid.ContextFlyout>
+                                <MenuFlyout>
+                                    <MenuFlyoutItem Click="OnOpenClick" Text="{x:Bind OpenLabel}" Visibility="{x:Bind CanOpen}">
+                                        <MenuFlyoutItem.Icon>
+                                            <FontIcon Glyph="&#xE8A7;" />
+                                        </MenuFlyoutItem.Icon>
+                                    </MenuFlyoutItem>
+                                    <MenuFlyoutItem Click="OnCopyClick" Text="Copy">
+                                        <MenuFlyoutItem.Icon>
+                                            <FontIcon Glyph="&#xE8C8;" />
+                                        </MenuFlyoutItem.Icon>
+                                    </MenuFlyoutItem>
+                                    <MenuFlyoutItem Click="OnCopySecretClick" Text="Copy password" Visibility="{x:Bind HasSecret}">
+                                        <MenuFlyoutItem.Icon>
+                                            <FontIcon Glyph="&#xE8D7;" />
+                                        </MenuFlyoutItem.Icon>
+                                    </MenuFlyoutItem>
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Click="OnDeleteClick" Text="Remove">
+                                        <MenuFlyoutItem.Icon>
+                                            <FontIcon Glyph="&#xE74D;" />
+                                        </MenuFlyoutItem.Icon>
+                                    </MenuFlyoutItem>
+                                </MenuFlyout>
+                            </Grid.ContextFlyout>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Border VerticalAlignment="Center" Style="{StaticResource IconBadgeStyle}">
+                                <FontIcon FontSize="16" Glyph="{x:Bind Glyph}" />
+                            </Border>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+                                <TextBlock MaxLines="1" Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind Content.Title}" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" MaxLines="1" Style="{StaticResource CaptionTextBlockStyle}" Text="{x:Bind Text}" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" VerticalAlignment="Center" Orientation="Horizontal" Spacing="2">
+                                <TextBlock Margin="0,0,6,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorTertiaryBrush}" Style="{StaticResource CaptionTextBlockStyle}" Text="{x:Bind When}" />
+                                <Button Width="32" Height="32" Padding="0" Click="OnOpenClick" Style="{StaticResource SubtleButtonStyle}" ToolTipService.ToolTip="{x:Bind OpenLabel}" Visibility="{x:Bind CanOpen}">
+                                    <FontIcon FontSize="14" Glyph="&#xE8A7;" />
+                                </Button>
+                                <Button Width="32" Height="32" Padding="0" Click="OnCopyClick" Style="{StaticResource SubtleButtonStyle}" ToolTipService.ToolTip="Copy">
+                                    <FontIcon FontSize="14" Glyph="&#xE8C8;" />
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+
+            <StackPanel x:Name="EmptyState" Grid.Row="2" Margin="0,24,0,0" HorizontalAlignment="Center" VerticalAlignment="Top" Spacing="6">
+                <FontIcon FontSize="28" Foreground="{ThemeResource TextFillColorTertiaryBrush}" Glyph="&#xE81C;" />
+                <TextBlock HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="Codes you scan will show up here." />
+            </StackPanel>
+
+            <Button x:Name="SettingsButton" Grid.Row="3" Padding="10,6" AutomationProperties.Name="Settings" Click="OnSettingsClick" Style="{StaticResource SubtleButtonStyle}">
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <FontIcon FontSize="16" Glyph="&#xE713;" />
+                    <TextBlock Text="Settings" />
+                </StackPanel>
+            </Button>
+
+        </Grid>
+
+        <!--  Settings  -->
+        <ScrollViewer x:Name="SettingsPage" Grid.Row="1" Visibility="Collapsed">
+            <StackPanel Padding="20,4,20,20" Spacing="4">
+                <TextBlock Margin="4,0,0,12" Style="{StaticResource SubtitleTextBlockStyle}" Text="Settings" />
+
+                <Grid Style="{StaticResource SettingRowStyle}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Scan shortcut" />
+                        <TextBlock x:Name="HotkeyDescription" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Style="{StaticResource CaptionTextBlockStyle}" Text="Starts a scan from anywhere, like Print Screen for Snipping Tool." TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ComboBox x:Name="HotkeyCombo" Grid.Column="1" MinWidth="150" VerticalAlignment="Center" SelectionChanged="OnHotkeyChanged" />
+                </Grid>
+
+                <Grid Style="{StaticResource SettingRowStyle}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Copy results automatically" />
+                        <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Style="{StaticResource CaptionTextBlockStyle}" Text="Put the decoded text on the clipboard as soon as a code is found." TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ToggleSwitch x:Name="AutoCopyToggle" Grid.Column="1" MinWidth="0" OffContent="" OnContent="" Toggled="OnSettingToggled" />
+                </Grid>
+
+                <Grid Style="{StaticResource SettingRowStyle}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Keep running in the background" />
+                        <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Style="{StaticResource CaptionTextBlockStyle}" Text="Closing the window keeps QRSnip in the notification area so the shortcut works anywhere." TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ToggleSwitch x:Name="BackgroundToggle" Grid.Column="1" MinWidth="0" OffContent="" OnContent="" Toggled="OnSettingToggled" />
+                </Grid>
+
+                <Grid Style="{StaticResource SettingRowStyle}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Start with Windows" />
+                        <TextBlock x:Name="StartupDescription" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Style="{StaticResource CaptionTextBlockStyle}" Text="Start quietly in the notification area when you sign in." TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ToggleSwitch x:Name="StartupToggle" Grid.Column="1" MinWidth="0" OffContent="" OnContent="" Toggled="OnStartupToggled" />
+                </Grid>
+
+                <Grid Style="{StaticResource SettingRowStyle}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Save scan history" />
+                        <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Style="{StaticResource CaptionTextBlockStyle}" Text="Stored only on this device. Turning it off clears it." TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ToggleSwitch x:Name="HistoryToggle" Grid.Column="1" MinWidth="0" OffContent="" OnContent="" Toggled="OnSettingToggled" />
+                </Grid>
+
+                <TextBlock Margin="4,20,0,6" Style="{StaticResource BodyStrongTextBlockStyle}" Text="About" />
+                <Grid Style="{StaticResource SettingRowStyle}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Image Width="32" Height="32" VerticalAlignment="Center" Source="ms-appx:///Assets/AppLogo.png" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="QRSnip" />
+                        <TextBlock x:Name="VersionText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Style="{StaticResource CaptionTextBlockStyle}" />
+                    </StackPanel>
+                </Grid>
+                <StackPanel Margin="0,4,0,0" Orientation="Horizontal" Spacing="4">
+                    <HyperlinkButton Content="Source code" NavigateUri="https://github.com/nakultt/QRSnip" />
+                    <HyperlinkButton Content="Report an issue" NavigateUri="https://github.com/nakultt/QRSnip/issues" />
+                    <HyperlinkButton Content="Privacy" NavigateUri="https://github.com/nakultt/QRSnip/blob/main/PRIVACY.md" />
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Window>

@@ -259,6 +259,46 @@ internal static unsafe partial class Win32
     [LibraryImport("ole32.dll")]
     public static partial int CoWaitForMultipleObjects(uint flags, uint timeout, uint count, nint* handles, out uint index);
 
+    public const int GWL_STYLE = -16;
+    public const long WS_FRAME_STYLES = 0x00C00000 /* CAPTION */ | 0x00040000 /* THICKFRAME */ | 0x00080000 /* SYSMENU */
+        | 0x00020000 /* MINIMIZEBOX */ | 0x00010000 /* MAXIMIZEBOX */;
+    public const uint SWP_NOSIZE = 0x1;
+    public const uint SWP_NOMOVE = 0x2;
+    public const uint SWP_NOZORDER = 0x4;
+    public const uint SWP_NOACTIVATE = 0x10;
+    public const uint SWP_FRAMECHANGED = 0x20;
+
+    [LibraryImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
+    public static partial nint GetWindowLongPtr(nint hwnd, int index);
+
+    [LibraryImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
+    public static partial nint SetWindowLongPtr(nint hwnd, int index, nint value);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool SetWindowPos(nint hwnd, nint insertAfter, int x, int y, int cx, int cy, uint flags);
+
+    /// <summary>Turns a window into a frameless popup (no 1px resize border at the edges).</summary>
+    public static void MakeFrameless(nint hwnd)
+    {
+        var style = (long)GetWindowLongPtr(hwnd, GWL_STYLE);
+        style = (style & ~WS_FRAME_STYLES) | unchecked((long)(ulong)WS_POPUP);
+        SetWindowLongPtr(hwnd, GWL_STYLE, (nint)style);
+        SetWindowPos(hwnd, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+    }
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool GetWindowRect(nint hwnd, out RECT rect);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool GetClientRect(nint hwnd, out RECT rect);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool ClientToScreen(nint hwnd, ref POINT point);
+
     public const uint WM_SETCURSOR = 0x0020;
     public const int HTCLIENT = 1;
 

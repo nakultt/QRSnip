@@ -39,7 +39,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Include="Assets\**\*.png" />
+    <Content Include="Assets\**\*.png" Exclude="Assets\AppLogo.png" />
+    <Content Include="Assets\AppLogo.png" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\AppIcon.ico" CopyToOutputDirectory="PreserveNewest" />
     <Manifest Include="$(ApplicationManifest)" />
   </ItemGroup>

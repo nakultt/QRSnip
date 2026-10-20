@@ -72,7 +72,7 @@
                 </ListView.ItemContainerStyle>
                 <ListView.ItemTemplate>
                     <DataTemplate x:DataType="services:HistoryEntry">
-                        <Grid Padding="12,10" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" ColumnSpacing="12" CornerRadius="{StaticResource ControlCornerRadius}" ToolTipService.ToolTip="{x:Bind Text}">
+                        <Grid Padding="12,10" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" ColumnSpacing="12" CornerRadius="{StaticResource ControlCornerRadius}" ToolTipService.ToolTip="{x:Bind Subtitle}">
                             <Grid.ContextFlyout>
                                 <MenuFlyout>
                                     <MenuFlyoutItem Click="OnOpenClick" Text="{x:Bind OpenLabel}" Visibility="{x:Bind CanOpen}">
@@ -108,7 +108,7 @@
                             </Border>
                             <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
                                 <TextBlock MaxLines="1" Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind Content.Title}" TextTrimming="CharacterEllipsis" />
-                                <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" MaxLines="1" Style="{StaticResource CaptionTextBlockStyle}" Text="{x:Bind Text}" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" MaxLines="1" Style="{StaticResource CaptionTextBlockStyle}" Text="{x:Bind Subtitle}" TextTrimming="CharacterEllipsis" />
                             </StackPanel>
                             <StackPanel Grid.Column="2" VerticalAlignment="Center" Orientation="Horizontal" Spacing="2">
                                 <TextBlock Margin="0,0,6,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorTertiaryBrush}" Style="{StaticResource CaptionTextBlockStyle}" Text="{x:Bind When}" />

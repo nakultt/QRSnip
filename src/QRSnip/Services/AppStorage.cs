@@ -49,6 +49,15 @@ public sealed class HistoryEntry
     [JsonIgnore]
     public bool HasSecret => !string.IsNullOrEmpty(Content.Secret);
 
+    /// <summary>One-line preview for lists; never shows a Wi-Fi password.</summary>
+    [JsonIgnore]
+    public string Subtitle => Content.Kind switch
+    {
+        ContentKind.Wifi => HasSecret ? "Wi-Fi network · password saved" : "Open Wi-Fi network",
+        ContentKind.Contact => "Contact card",
+        _ => Text.ReplaceLineEndings(" "),
+    };
+
     private ContentInfo? _content;
 }
 

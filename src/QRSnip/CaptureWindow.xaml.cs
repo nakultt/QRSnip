@@ -58,6 +58,7 @@ public sealed partial class CaptureWindow : Window
         presenter.IsAlwaysOnTop = true;
         AppWindow.SetPresenter(presenter);
         AppWindow.IsShownInSwitchers = false;
+        Win32.MakeFrameless(_hwnd);
 
         Win32.SetDwmInt(_hwnd, Win32.DWMWA_TRANSITIONS_FORCEDISABLED, 1);
         Win32.SetDwmInt(_hwnd, Win32.DWMWA_WINDOW_CORNER_PREFERENCE, Win32.DWMWCP_DONOTROUND);
@@ -157,8 +158,30 @@ public sealed partial class CaptureWindow : Window
         storyboard.Begin();
     }
 
-    private void CoverDesktop() =>
-        AppWindow.MoveAndResize(new RectInt32(_shot.Left, _shot.Top, _shot.Image.Width, _shot.Image.Height));
+    /// <summary>
+    /// Sizes the window so its <em>client area</em> matches the desktop exactly. WinUI keeps a few
+    /// pixels of invisible frame even on a borderless window; left alone they show up as a thin
+    /// light line at the screen edges, so they are pushed off-screen instead.
+    /// </summary>
+    private void CoverDesktop()
+    {
+        var (x, y, w, h) = (_shot.Left, _shot.Top, _shot.Image.Width, _shot.Image.Height);
+        AppWindow.MoveAndResize(new RectInt32(x, y, w, h));
+
+        Win32.GetWindowRect(_hwnd, out var outer);
+        Win32.GetClientRect(_hwnd, out var client);
+        var origin = default(Win32.POINT);
+        Win32.ClientToScreen(_hwnd, ref origin);
+
+        var left = origin.X - outer.Left;
+        var top = origin.Y - outer.Top;
+        var right = outer.Right - outer.Left - client.Right - left;
+        var bottom = outer.Bottom - outer.Top - client.Bottom - top;
+        if (left != 0 || top != 0 || right != 0 || bottom != 0)
+        {
+            AppWindow.MoveAndResize(new RectInt32(x - left, y - top, w + left + right, h + top + bottom));
+        }
+    }
 
     private void OnActivated(object sender, WindowActivatedEventArgs args)
     {

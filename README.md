@@ -108,9 +108,10 @@ Planned work, in the order it will be built (see [milestones](https://github.com
 1. [#1](https://github.com/nakultt/QRSnip/issues/1) Fix cursor flicker while dragging (v1.0.1)
 2. [#2](https://github.com/nakultt/QRSnip/issues/2) System tray and background running polish (v1.1.0)
 3. [#3](https://github.com/nakultt/QRSnip/issues/3) Installable app: Microsoft Store, winget, signed MSIX (v1.1.0)
-4. [#4](https://github.com/nakultt/QRSnip/issues/4) Full screen scan mode (v1.2.0)
-5. [#5](https://github.com/nakultt/QRSnip/issues/5) Scan from image files: open, drag and drop, paste (v1.2.0)
-6. [#6](https://github.com/nakultt/QRSnip/issues/6) Scan with the camera (v1.3.0)
+4. [#7](https://github.com/nakultt/QRSnip/issues/7) Check for updates and update from inside the app (v1.1.0)
+5. [#4](https://github.com/nakultt/QRSnip/issues/4) Full screen scan mode (v1.2.0)
+6. [#5](https://github.com/nakultt/QRSnip/issues/5) Scan from image files: open, drag and drop, paste (v1.2.0)
+7. [#6](https://github.com/nakultt/QRSnip/issues/6) Scan with the camera (v1.3.0)
 
 ## Contributing
 

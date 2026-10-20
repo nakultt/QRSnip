@@ -31,7 +31,8 @@ if ($packageVersion -ne "$version.0") {
     throw "Package.appxmanifest has version $packageVersion but Directory.Build.props has $version. Set the manifest to $version.0."
 }
 
-New-Item -ItemType Directory -Force $Output | Out-Null
+# MSBuild resolves relative paths against the project, so always pass absolute ones.
+$Output = (New-Item -ItemType Directory -Force $Output).FullName
 Write-Host "QRSnip $version -> $Output" -ForegroundColor Cyan
 
 if (-not $SkipPortable) {

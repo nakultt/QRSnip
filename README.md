@@ -102,6 +102,17 @@ Built with WinUI 3 / Windows App SDK 2.x on .NET 10, using [ZXing.Net](https://g
 2. Publish a GitHub release tagged `vX.Y.Z`. The [release workflow](.github/workflows/release.yml) builds the packages, attaches the portable zips to the release and keeps the Store bundle as a workflow artifact.
 3. Upload the `.msixupload` to Partner Center. See [docs/PUBLISHING.md](docs/PUBLISHING.md).
 
+## Roadmap
+
+Planned work, in the order it will be built (see [milestones](https://github.com/nakultt/QRSnip/milestones)):
+
+1. [#1](https://github.com/nakultt/QRSnip/issues/1) Fix cursor flicker while dragging (v1.0.1)
+2. [#2](https://github.com/nakultt/QRSnip/issues/2) System tray and background running polish (v1.1.0)
+3. [#3](https://github.com/nakultt/QRSnip/issues/3) Installable app: Microsoft Store, winget, signed MSIX (v1.1.0)
+4. [#4](https://github.com/nakultt/QRSnip/issues/4) Full screen scan mode (v1.2.0)
+5. [#5](https://github.com/nakultt/QRSnip/issues/5) Scan from image files: open, drag and drop, paste (v1.2.0)
+6. [#6](https://github.com/nakultt/QRSnip/issues/6) Scan with the camera (v1.3.0)
+
 ## Contributing
 
 Issues and pull requests are welcome. Please run the tests before opening a PR, and keep UI changes consistent with the Windows 11 design language.

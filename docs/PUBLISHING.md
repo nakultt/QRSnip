@@ -49,5 +49,6 @@ in the README's *Install* table.
 ## Updating
 
 1. Bump the version (see above) and update `CHANGELOG.md`.
-2. Publish a GitHub release; the release workflow attaches the new `.msixupload`.
+2. Publish a GitHub release; download the `.msixupload` from the release workflow's
+   `qrsnip-packages` artifact (or build it locally with `./build/package.ps1 -SkipPortable`).
 3. In Partner Center, create an **update submission**, replace the package, and submit.

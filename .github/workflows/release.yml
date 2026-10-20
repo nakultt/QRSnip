@@ -1,7 +1,7 @@
 name: Release
 
-# Publishing a GitHub release builds the portable zips and the Store bundle
-# and attaches them to that release.
+# Publishing a GitHub release builds the portable zips and the Store bundle,
+# attaches the zips to that release and keeps everything as a workflow artifact.
 on:
   release:
     types: [published]
@@ -37,4 +37,5 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ github.event.release.tag_name }}" (Get-ChildItem artifacts -File).FullName --clobber
+        # Users get the portable zips; the .msixupload stays in the workflow artifact for Partner Center.
+        run: gh release upload "${{ github.event.release.tag_name }}" (Get-ChildItem artifacts -Filter *.zip).FullName --clobber

@@ -99,7 +99,7 @@ Built with WinUI 3 / Windows App SDK 2.x on .NET 10, using [ZXing.Net](https://g
 ## Releasing
 
 1. Bump `Version` in `Directory.Build.props` and `Identity/@Version` in `src/QRSnip/Package.appxmanifest`, and update [CHANGELOG.md](CHANGELOG.md).
-2. Publish a GitHub release tagged `vX.Y.Z`. The [release workflow](.github/workflows/release.yml) builds and attaches the portable zips and Store bundle.
+2. Publish a GitHub release tagged `vX.Y.Z`. The [release workflow](.github/workflows/release.yml) builds the packages, attaches the portable zips to the release and keeps the Store bundle as a workflow artifact.
 3. Upload the `.msixupload` to Partner Center. See [docs/PUBLISHING.md](docs/PUBLISHING.md).
 
 ## Contributing

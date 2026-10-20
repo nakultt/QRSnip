@@ -1,11 +1,18 @@
 name: Release
 
-# Publishing a GitHub release builds the portable zips and the Store bundle,
-# attaches the zips to that release and keeps everything as a workflow artifact.
+# Publishing a GitHub release:
+#   1. builds the portable zips and the Store bundle, and attaches the zips to the release;
+#   2. submits the Store bundle to the Microsoft Store as an update (once configured, see
+#      docs/PUBLISHING.md). Pre-releases are never sent to the Store.
 on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      submit-to-store:
+        description: Also submit this build to the Microsoft Store
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -37,5 +44,45 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        # Users get the portable zips; the .msixupload stays in the workflow artifact for Partner Center.
+        # Users get the portable zips; the .msixupload goes to the Store job below.
         run: gh release upload "${{ github.event.release.tag_name }}" (Get-ChildItem artifacts -Filter *.zip).FullName --clobber
+
+  store:
+    needs: package
+    # Skipped until the STORE_PRODUCT_ID repository variable exists.
+    if: >-
+      vars.STORE_PRODUCT_ID != '' &&
+      ((github.event_name == 'release' && !github.event.release.prerelease) ||
+       (github.event_name == 'workflow_dispatch' && inputs.submit-to-store))
+    runs-on: windows-latest
+    # Add required reviewers to this environment (Settings › Environments) to approve each submission.
+    environment: microsoft-store
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: qrsnip-packages
+          path: artifacts
+
+      - name: Set up Microsoft Store Developer CLI
+        uses: microsoft/microsoft-store-apppublisher@v1.4
+
+      - name: Sign in to Partner Center
+        shell: pwsh
+        run: >-
+          msstore reconfigure
+          --tenantId "${{ secrets.AZURE_AD_TENANT_ID }}"
+          --sellerId "${{ secrets.SELLER_ID }}"
+          --clientId "${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }}"
+          --clientSecret "${{ secrets.AZURE_AD_APPLICATION_SECRET }}"
+
+      - name: Submit update
+        shell: pwsh
+        env:
+          PRODUCT_ID: ${{ vars.STORE_PRODUCT_ID }}
+          ROLLOUT: ${{ vars.STORE_ROLLOUT_PERCENTAGE }}
+        run: |
+          $package = (Get-ChildItem artifacts -Filter *.msixupload | Select-Object -First 1).FullName
+          $rollout = if ($env:ROLLOUT) { [int]$env:ROLLOUT } else { 100 }
+          ./build/publish-store.ps1 -Package $package -ProductId $env:PRODUCT_ID -RolloutPercentage $rollout

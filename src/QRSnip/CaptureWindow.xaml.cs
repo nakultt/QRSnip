@@ -62,6 +62,11 @@ public sealed partial class CaptureWindow : Window
         Win32.SetDwmInt(_hwnd, Win32.DWMWA_TRANSITIONS_FORCEDISABLED, 1);
         Win32.SetDwmInt(_hwnd, Win32.DWMWA_WINDOW_CORNER_PREFERENCE, Win32.DWMWCP_DONOTROUND);
         Win32.SetDwmInt(_hwnd, Win32.DWMWA_BORDER_COLOR, unchecked((int)Win32.DWMWA_COLOR_NONE));
+        unsafe
+        {
+            Win32.SetWindowSubclass(_hwnd, &CursorSubclassProc, CursorSubclassId, 0);
+        }
+
         CoverDesktop();
 
         Root.SizeChanged += (_, _) => OnLayoutReady();
@@ -70,29 +75,86 @@ public sealed partial class CaptureWindow : Window
         {
             _closed = true;
             Shot.Source = null;
+            unsafe
+            {
+                Win32.RemoveWindowSubclass(_hwnd, &CursorSubclassProc, CursorSubclassId);
+            }
         };
     }
 
     public void Show()
     {
-        // Render while cloaked, then reveal: without this the first frame is an empty (black)
-        // window and the screen visibly flashes. Snipping Tool behaves the same way.
+        // Render while cloaked and reveal only once the frozen screenshot has been drawn a few
+        // times; otherwise the first visible frame is an empty black window.
         Win32.SetDwmInt(_hwnd, Win32.DWMWA_CLOAK, 1);
         Activate();
         CoverDesktop(); // again, in case a DPI change on activation resized us
         Win32.SetForegroundWindow(_hwnd);
 
         var frames = 0;
+        var revealed = false;
+        void Reveal()
+        {
+            if (revealed)
+            {
+                return;
+            }
+
+            revealed = true;
+            Microsoft.UI.Xaml.Media.CompositionTarget.Rendering -= OnRendering;
+            Win32.SetDwmInt(_hwnd, Win32.DWMWA_CLOAK, 0);
+            FadeIn(Dim, 150); // the undimmed screenshot matches the live screen, so this is seamless
+        }
+
         void OnRendering(object? sender, object e)
         {
-            if (++frames >= 2 || _closed)
+            if (_closed || (Shot.ActualWidth > 0 && ++frames >= RevealAfterFrames))
             {
-                Microsoft.UI.Xaml.Media.CompositionTarget.Rendering -= OnRendering;
-                Win32.SetDwmInt(_hwnd, Win32.DWMWA_CLOAK, 0);
+                Reveal();
             }
         }
 
         Microsoft.UI.Xaml.Media.CompositionTarget.Rendering += OnRendering;
+        DispatcherQueue.TryEnqueue(async () =>
+        {
+            await Task.Delay(400); // safety net if rendering stalls while cloaked
+            Reveal();
+        });
+    }
+
+    private const int RevealAfterFrames = 6;
+    private const nuint CursorSubclassId = 1;
+
+    /// <summary>
+    /// The window class has an arrow cursor, so on every mouse move Windows resets the cursor
+    /// to an arrow before WinUI sets the crosshair again, which flickers. Swallowing
+    /// WM_SETCURSOR in the client area leaves the cursor entirely to WinUI.
+    /// </summary>
+    [System.Runtime.InteropServices.UnmanagedCallersOnly]
+    private static nint CursorSubclassProc(nint hwnd, uint msg, nint wParam, nint lParam, nuint id, nuint data)
+    {
+        if (msg == Win32.WM_SETCURSOR && (lParam & 0xFFFF) == Win32.HTCLIENT)
+        {
+            return 1;
+        }
+
+        return Win32.DefSubclassProc(hwnd, msg, wParam, lParam);
+    }
+
+    private static void FadeIn(UIElement element, int milliseconds)
+    {
+        var animation = new Microsoft.UI.Xaml.Media.Animation.DoubleAnimation
+        {
+            From = 0,
+            To = 1,
+            Duration = TimeSpan.FromMilliseconds(milliseconds),
+            EasingFunction = new Microsoft.UI.Xaml.Media.Animation.CubicEase { EasingMode = Microsoft.UI.Xaml.Media.Animation.EasingMode.EaseOut },
+        };
+        Microsoft.UI.Xaml.Media.Animation.Storyboard.SetTarget(animation, element);
+        Microsoft.UI.Xaml.Media.Animation.Storyboard.SetTargetProperty(animation, "Opacity");
+        var storyboard = new Microsoft.UI.Xaml.Media.Animation.Storyboard();
+        storyboard.Children.Add(animation);
+        storyboard.Begin();
     }
 
     private void CoverDesktop() =>

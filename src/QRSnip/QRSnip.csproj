@@ -21,6 +21,7 @@
     <GenerateAppInstallerFile>false</GenerateAppInstallerFile>
     <AppxSymbolPackageEnabled>false</AppxSymbolPackageEnabled>
     <PublishReadyToRun Condition="'$(Configuration)' == 'Release'">true</PublishReadyToRun>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
 
   <!-- Portable (unpackaged, self-contained) build: dotnet publish -p:Portable=true -->
@@ -46,7 +47,10 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2705" />
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.5.1" />
+    <!-- Only the Windows App SDK components QRSnip uses (the metapackage also ships the AI/ML stack). -->
+    <PackageReference Include="Microsoft.WindowsAppSDK.WinUI" Version="2.3.9" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.Foundation" Version="2.3.12" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.InteractiveExperiences" Version="2.1.9" />
   </ItemGroup>
 
   <ItemGroup>

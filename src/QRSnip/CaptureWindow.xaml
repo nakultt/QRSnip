@@ -21,7 +21,7 @@
         <Image x:Name="Shot" Stretch="Fill" />
 
         <!--  Everything outside the selection is dimmed.  -->
-        <Grid x:Name="Dim" IsHitTestVisible="False">
+        <Grid x:Name="Dim" IsHitTestVisible="False" Opacity="0">
             <Grid.RowDefinitions>
                 <RowDefinition x:Name="DimTop" Height="0" />
                 <RowDefinition x:Name="DimMiddle" Height="0" />
@@ -32,10 +32,10 @@
                 <ColumnDefinition x:Name="DimCenter" Width="0" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
-            <Rectangle Grid.ColumnSpan="3" Fill="#8C000000" />
-            <Rectangle Grid.Row="1" Fill="#8C000000" />
-            <Rectangle Grid.Row="1" Grid.Column="2" Fill="#8C000000" />
-            <Rectangle Grid.Row="2" Grid.ColumnSpan="3" Fill="#8C000000" />
+            <Rectangle Grid.ColumnSpan="3" Fill="#80000000" />
+            <Rectangle Grid.Row="1" Fill="#80000000" />
+            <Rectangle Grid.Row="1" Grid.Column="2" Fill="#80000000" />
+            <Rectangle Grid.Row="2" Grid.ColumnSpan="3" Fill="#80000000" />
         </Grid>
 
         <Canvas x:Name="Layer">

@@ -259,6 +259,20 @@ internal static unsafe partial class Win32
     [LibraryImport("ole32.dll")]
     public static partial int CoWaitForMultipleObjects(uint flags, uint timeout, uint count, nint* handles, out uint index);
 
+    public const uint WM_SETCURSOR = 0x0020;
+    public const int HTCLIENT = 1;
+
+    [LibraryImport("comctl32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool SetWindowSubclass(nint hwnd, delegate* unmanaged<nint, uint, nint, nint, nuint, nuint, nint> proc, nuint id, nuint data);
+
+    [LibraryImport("comctl32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool RemoveWindowSubclass(nint hwnd, delegate* unmanaged<nint, uint, nint, nint, nuint, nuint, nint> proc, nuint id);
+
+    [LibraryImport("comctl32.dll")]
+    public static partial nint DefSubclassProc(nint hwnd, uint msg, nint wParam, nint lParam);
+
     public static void SetDwmInt(nint hwnd, int attribute, int value) =>
         DwmSetWindowAttribute(hwnd, attribute, value, sizeof(int));
 }

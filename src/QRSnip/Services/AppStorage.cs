@@ -5,10 +5,23 @@ using QRSnip.Core;
 
 namespace QRSnip.Services;
 
+/// <summary>How a scan picks what to read: a dragged area, or every screen at once.</summary>
+public enum ScanMode
+{
+    Area,
+    FullScreen,
+}
+
 public sealed class AppSettings
 {
     /// <summary>The global shortcut that starts a scan.</summary>
     public string Hotkey { get; set; } = "F10";
+
+    /// <summary>The global shortcut that scans every screen at once ("None" to turn it off).</summary>
+    public string FullScreenHotkey { get; set; } = "Shift + F10";
+
+    /// <summary>The mode last used in the overlay; the main shortcut and New scan start in it.</summary>
+    public ScanMode LastScanMode { get; set; }
 
     /// <summary>Copy the decoded text to the clipboard as soon as a code is found.</summary>
     public bool AutoCopy { get; set; }
@@ -52,8 +65,14 @@ public sealed class HistoryEntry
     [JsonIgnore]
     public string Glyph => ResultPresenter.Glyph(Content.Kind);
 
+    /// <summary>The code's number on screen in full screen mode, shown in its label.</summary>
     [JsonIgnore]
-    public string KindLabel => ResultPresenter.Label(Content.Kind);
+    public int? Number { get; init; }
+
+    [JsonIgnore]
+    public string KindLabel => Number is { } n
+        ? $"{n} · {ResultPresenter.Label(Content.Kind)}"
+        : ResultPresenter.Label(Content.Kind);
 
     [JsonIgnore]
     public string OpenLabel => ResultPresenter.OpenLabel(Content.Kind);

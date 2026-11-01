@@ -208,6 +208,8 @@ public sealed partial class MainWindow : Window
         _loadingSettings = true;
         HotkeyCombo.ItemsSource ??= ShellHost.HotkeyOptions;
         HotkeyCombo.SelectedItem = App.Current.Hotkey;
+        FullScreenHotkeyCombo.ItemsSource ??= ShellHost.FullScreenHotkeyOptions;
+        FullScreenHotkeyCombo.SelectedItem = App.Current.FullScreenHotkey ?? ShellHost.NoHotkey;
         AutoCopyToggle.IsOn = _storage.Settings.AutoCopy;
         BackgroundToggle.IsOn = _storage.Settings.RunInBackground;
         TrayClickCombo.SelectedIndex = _storage.Settings.TrayClickStartsScan ? 1 : 0;
@@ -360,6 +362,27 @@ public sealed partial class MainWindow : Window
         }
 
         BuildHotkeyHint();
+    }
+
+    private void OnFullScreenHotkeyChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_loadingSettings || FullScreenHotkeyCombo.SelectedItem is not string wanted)
+        {
+            return;
+        }
+
+        var actual = App.Current.ChangeFullScreenHotkey(wanted) ?? ShellHost.NoHotkey;
+        if (actual != wanted)
+        {
+            _loadingSettings = true;
+            FullScreenHotkeyCombo.SelectedItem = actual;
+            _loadingSettings = false;
+            FullScreenHotkeyDescription.Text = $"{wanted} is already used by another app, so {(actual == ShellHost.NoHotkey ? "no shortcut" : actual)} is active.";
+        }
+        else
+        {
+            FullScreenHotkeyDescription.Text = "Finds every QR code on every screen at once, no dragging.";
+        }
     }
 
     private async void OnStartupToggled(object sender, RoutedEventArgs e)

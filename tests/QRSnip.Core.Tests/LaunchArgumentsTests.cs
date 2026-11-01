@@ -46,6 +46,15 @@ public class LaunchArgumentsTests
     }
 
     [Fact]
+    public void Merges_activation_and_process_arguments()
+    {
+        var merged = LaunchArguments.Parse(@"--scan C:\a.png").Merge(LaunchArguments.Parse([@"C:\A.PNG", "--background", @"C:\b.jpg"]));
+
+        Assert.True(merged.Scan && merged.Background);
+        Assert.Equal([@"C:\a.png", @"C:\b.jpg"], merged.Files);
+    }
+
+    [Fact]
     public void Empty_command_line_is_a_plain_launch()
     {
         Assert.True(LaunchArguments.Parse((string?)null).IsPlainLaunch);

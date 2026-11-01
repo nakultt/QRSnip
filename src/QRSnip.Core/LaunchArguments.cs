@@ -16,6 +16,18 @@ public sealed record LaunchArguments(bool Scan, bool FullScreen, bool Camera, bo
     /// <summary>True when nothing specific was asked for, so the main window should open.</summary>
     public bool IsPlainLaunch => !Scan && !FullScreen && !Camera && !Background && Files.Count == 0;
 
+    /// <summary>Combines two sets of arguments, e.g. the activation's and the process's own.</summary>
+    public LaunchArguments Merge(LaunchArguments other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+        return new LaunchArguments(
+            Scan || other.Scan,
+            FullScreen || other.FullScreen,
+            Camera || other.Camera,
+            Background || other.Background,
+            Files.Concat(other.Files).Distinct(StringComparer.OrdinalIgnoreCase).ToList());
+    }
+
     /// <summary>Parses a raw command line (without the program name) using the Windows quoting rules.</summary>
     public static LaunchArguments Parse(string? commandLine) => Parse(Split(commandLine ?? string.Empty));
 

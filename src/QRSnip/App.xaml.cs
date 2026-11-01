@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Windows.AppLifecycle;
 using Microsoft.Windows.AppNotifications;
+using QRSnip.Core;
 using QRSnip.Native;
 using QRSnip.Services;
 using Windows.ApplicationModel.Activation;
@@ -46,6 +47,8 @@ public partial class App : Application
 
     public string? Hotkey => _shell?.Hotkey;
 
+    public string? FullScreenHotkey => _shell?.FullScreenHotkey;
+
     internal UpdateService? Updates => _updates;
 
     /// <summary>An update check finished or an update became available.</summary>
@@ -62,8 +65,10 @@ public partial class App : Application
 
         _shell = new ShellHost(Path.Combine(AppContext.BaseDirectory, "Assets"));
         _shell.RegisterHotkey(Storage.Settings.Hotkey);
+        _shell.RegisterFullScreenHotkey(Storage.Settings.FullScreenHotkey);
         _shell.ShowTrayIcon(Storage.Settings.RunInBackground);
         _shell.ScanRequested += (_, _) => StartScan();
+        _shell.FullScreenScanRequested += (_, _) => StartScan(ScanMode.FullScreen);
         _shell.TrayClicked += (_, _) => OnTrayClicked();
         _shell.MenuRequested += (_, pt) => ShowTrayMenu(pt);
         _shell.OpenRequested += (_, _) => ShowMainWindow();
@@ -158,18 +163,29 @@ public partial class App : Application
         return _shell?.RegisterHotkey(preferred);
     }
 
+    /// <summary>Re-registers the full screen shortcut and returns the one actually in effect (null: none).</summary>
+    public string? ChangeFullScreenHotkey(string preferred)
+    {
+        Storage.Settings.FullScreenHotkey = preferred;
+        Storage.SaveSettings();
+        return _shell?.RegisterFullScreenHotkey(preferred);
+    }
+
     public void ShowMainWindow()
     {
         _idleTimer?.Stop();
         EnsureMainWindow().ShowAndFocus();
     }
 
-    public async void StartScan()
+    /// <summary>Opens the capture overlay, in the last used mode unless one is given.</summary>
+    public async void StartScan(ScanMode? mode = null)
     {
         if (_capture is not null || _exiting)
         {
             return;
         }
+
+        var scanMode = mode ?? Storage.Settings.LastScanMode;
 
         // Take the main window out of the picture before freezing the screen.
         var restoreMain = _mainWindow?.Visible == true;
@@ -182,7 +198,7 @@ public partial class App : Application
         ScreenShot shot;
         try
         {
-            shot = ScreenCapture.CaptureVirtualScreen();
+            shot = await ScreenCapture.CaptureAsync();
         }
         catch (InvalidOperationException)
         {
@@ -194,7 +210,12 @@ public partial class App : Application
             return;
         }
 
-        _capture = new CaptureWindow(shot, Storage);
+        if (_capture is not null || _exiting)
+        {
+            return; // another scan started while capturing
+        }
+
+        _capture = new CaptureWindow(shot, Storage, scanMode);
         _capture.Closed += (_, _) =>
         {
             _capture = null;
@@ -324,7 +345,8 @@ public partial class App : Application
     {
         var items = new List<MenuFlyoutItemBase>
         {
-            MenuItem("Scan QR code", "", StartScan, Hotkey),
+            MenuItem("Scan QR code", "", () => StartScan(), Hotkey),
+            MenuItem("Scan full screen", "", () => StartScan(ScanMode.FullScreen), FullScreenHotkey),
             new MenuFlyoutSeparator(),
         };
 
@@ -435,23 +457,27 @@ public partial class App : Application
             return;
         }
 
-        var commandLine = args.Kind switch
+        var launch = args.Kind switch
         {
-            ExtendedActivationKind.Launch => (args.Data as ILaunchActivatedEventArgs)?.Arguments ?? string.Empty,
-            ExtendedActivationKind.StartupTask => "--background",
-            _ => string.Empty,
+            ExtendedActivationKind.Launch => LaunchArguments.Parse((args.Data as ILaunchActivatedEventArgs)?.Arguments),
+            ExtendedActivationKind.StartupTask => LaunchArguments.Parse(["--background"]),
+            _ => LaunchArguments.Empty,
         };
 
         if (initial)
         {
-            commandLine += " " + string.Join(' ', Environment.GetCommandLineArgs().Skip(1));
+            launch = launch.Merge(LaunchArguments.Parse(Environment.GetCommandLineArgs().Skip(1)));
         }
 
-        if (commandLine.Contains("--scan", StringComparison.OrdinalIgnoreCase))
+        if (launch.FullScreen)
+        {
+            StartScan(ScanMode.FullScreen);
+        }
+        else if (launch.Scan)
         {
             StartScan();
         }
-        else if (initial && commandLine.Contains("--background", StringComparison.OrdinalIgnoreCase) && Storage.Settings.RunInBackground)
+        else if (initial && launch.Background && Storage.Settings.RunInBackground)
         {
             // Started with Windows: stay in the notification area.
         }

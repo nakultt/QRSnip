@@ -369,4 +369,29 @@ internal static unsafe partial class Win32
 
     [LibraryImport("kernel32.dll", StringMarshalling = StringMarshalling.Utf16)]
     public static partial int RegisterApplicationRestart(string? commandLine, uint flags);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool EnumDisplayMonitors(nint hdc, nint clip, delegate* unmanaged<nint, nint, RECT*, nint, int> callback, nint data);
+
+    // Windows.Graphics.Capture interop (fallback capture for full-screen apps).
+    public const int D3D_DRIVER_TYPE_HARDWARE = 1;
+    public const int D3D_DRIVER_TYPE_WARP = 5;
+    public const uint D3D11_CREATE_DEVICE_BGRA_SUPPORT = 0x20;
+    public const uint D3D11_SDK_VERSION = 7;
+
+    [LibraryImport("d3d11.dll")]
+    public static partial int D3D11CreateDevice(nint adapter, int driverType, nint software, uint flags, nint featureLevels, uint featureLevelCount, uint sdkVersion, out nint device, out int featureLevel, out nint context);
+
+    [LibraryImport("d3d11.dll")]
+    public static partial int CreateDirect3D11DeviceFromDXGIDevice(nint dxgiDevice, out nint graphicsDevice);
+
+    [LibraryImport("combase.dll", StringMarshalling = StringMarshalling.Utf16)]
+    public static partial int WindowsCreateString(string source, int length, out nint hstring);
+
+    [LibraryImport("combase.dll")]
+    public static partial int WindowsDeleteString(nint hstring);
+
+    [LibraryImport("combase.dll")]
+    public static partial int RoGetActivationFactory(nint activatableClassId, in Guid iid, out nint factory);
 }

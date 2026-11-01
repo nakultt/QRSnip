@@ -181,6 +181,18 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Full screen scan shortcut" />
+                        <TextBlock x:Name="FullScreenHotkeyDescription" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Style="{StaticResource CaptionTextBlockStyle}" Text="Finds every QR code on every screen at once, no dragging." TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ComboBox x:Name="FullScreenHotkeyCombo" Grid.Column="1" MinWidth="150" VerticalAlignment="Center" SelectionChanged="OnFullScreenHotkeyChanged" />
+                </Grid>
+
+                <Grid Style="{StaticResource SettingRowStyle}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="Copy results automatically" />
                         <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Style="{StaticResource CaptionTextBlockStyle}" Text="Put the decoded text on the clipboard as soon as a code is found." TextWrapping="Wrap" />
                     </StackPanel>

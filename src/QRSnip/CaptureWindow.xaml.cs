@@ -3,9 +3,12 @@ using System.Runtime.InteropServices.WindowsRuntime;
 using Microsoft.UI.Input;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
+using Microsoft.UI.Xaml.Shapes;
 using QRSnip.Core;
 using QRSnip.Native;
 using QRSnip.Services;
@@ -17,30 +20,41 @@ using WinRT.Interop;
 namespace QRSnip;
 
 /// <summary>
-/// Full-desktop overlay showing a frozen screenshot. The user drags a box (or clicks for the
-/// whole monitor) and any codes inside it are decoded and shown in a card next to the box.
+/// Full-desktop overlay showing a frozen screenshot. In <see cref="ScanMode.Area"/> the user
+/// drags a box (or clicks for the whole monitor) and any codes inside it are decoded and shown
+/// in a card next to the box. In <see cref="ScanMode.FullScreen"/> every monitor is decoded at
+/// once and each code is outlined and numbered.
 /// </summary>
 public sealed partial class CaptureWindow : Window
 {
     private const double MinDrag = 6;
     private const double Gap = 12;
+    private const double ChipSize = 28;
+    private const int RevealAfterFrames = 6;
 
     private readonly ScreenShot _shot;
     private readonly AppStorage _storage;
     private readonly nint _hwnd;
     private readonly ObservableCollection<HistoryEntry> _results = [];
+    private readonly List<FrameworkElement> _chips = [];
+    private readonly List<Polygon> _outlines = [];
 
+    private ScanMode _mode;
+    private IReadOnlyList<ScanResult> _found = []; // full screen results
+    private int _focused = -1;
     private double _scale = 1; // physical pixels per DIP
     private Point _start;
     private Rect _selection;
     private bool _dragging;
     private bool _busy;
     private bool _closed;
+    private bool _started;
 
-    internal CaptureWindow(ScreenShot shot, AppStorage storage)
+    internal CaptureWindow(ScreenShot shot, AppStorage storage, ScanMode mode)
     {
         _shot = shot;
         _storage = storage;
+        _mode = mode;
         InitializeComponent();
         _hwnd = WindowNative.GetWindowHandle(this);
 
@@ -49,6 +63,7 @@ public sealed partial class CaptureWindow : Window
         bitmap.Invalidate();
         Shot.Source = bitmap;
         Results.ItemsSource = _results;
+        UpdateModeButtons();
 
         var presenter = OverlappedPresenter.Create();
         presenter.SetBorderAndTitleBar(false, false);
@@ -68,6 +83,7 @@ public sealed partial class CaptureWindow : Window
 
         Root.SizeChanged += (_, _) => OnLayoutReady();
         Card.SizeChanged += (_, _) => UpdateCursorAreas();
+        Hint.SizeChanged += (_, _) => UpdateCursorAreas();
         Activated += OnActivated;
         Closed += (_, _) =>
         {
@@ -80,7 +96,8 @@ public sealed partial class CaptureWindow : Window
     public void Show()
     {
         // Render while cloaked and reveal only once the frozen screenshot has been drawn a few
-        // times; otherwise the first visible frame is an empty black window.
+        // times; otherwise the first visible frame is an empty black window. Activating and
+        // bringing it to the front also puts it above borderless full-screen apps.
         Win32.SetDwmInt(_hwnd, Win32.DWMWA_CLOAK, 1);
         Activate();
         CoverDesktop(); // again, in case a DPI change on activation resized us
@@ -97,7 +114,7 @@ public sealed partial class CaptureWindow : Window
             }
 
             revealed = true;
-            Microsoft.UI.Xaml.Media.CompositionTarget.Rendering -= OnRendering;
+            CompositionTarget.Rendering -= OnRendering;
             OverlayCursor.HookTree(_hwnd); // XAML creates its input windows lazily
             Win32.SetDwmInt(_hwnd, Win32.DWMWA_CLOAK, 0);
             FadeIn(Dim, 150); // the undimmed screenshot matches the live screen, so this is seamless
@@ -111,15 +128,13 @@ public sealed partial class CaptureWindow : Window
             }
         }
 
-        Microsoft.UI.Xaml.Media.CompositionTarget.Rendering += OnRendering;
+        CompositionTarget.Rendering += OnRendering;
         DispatcherQueue.TryEnqueue(async () =>
         {
             await Task.Delay(400); // safety net if rendering stalls while cloaked
             Reveal();
         });
     }
-
-    private const int RevealAfterFrames = 6;
 
     private static void FadeIn(UIElement element, int milliseconds)
     {
@@ -185,27 +200,251 @@ public sealed partial class CaptureWindow : Window
         _scale = _shot.Image.Width / Root.ActualWidth;
         PlaceHint(ToDip(ScreenCapture.MonitorUnderCursor()));
         OverlayCursor.HookTree(_hwnd);
-    }
 
-    /// <summary>Tells <see cref="OverlayCursor"/> where the arrow should show instead of the crosshair.</summary>
-    private void UpdateCursorAreas()
-    {
-        OverlayCursor.SetArrowAreas(Card.Visibility == Visibility.Visible ? [ToScreen(Card)] : []);
-    }
-
-    /// <summary>Screen bounds (physical pixels) of an element placed on the overlay canvas.</summary>
-    private Win32.RECT ToScreen(FrameworkElement element)
-    {
-        var left = Canvas.GetLeft(element);
-        var top = Canvas.GetTop(element);
-        return new Win32.RECT
+        if (!_started)
         {
-            Left = _shot.Left + (int)Math.Floor(left * _scale),
-            Top = _shot.Top + (int)Math.Floor(top * _scale),
-            Right = _shot.Left + (int)Math.Ceiling((left + element.ActualWidth) * _scale),
-            Bottom = _shot.Top + (int)Math.Ceiling((top + element.ActualHeight) * _scale),
-        };
+            _started = true;
+            if (_mode == ScanMode.FullScreen)
+            {
+                _ = ScanAllAsync();
+            }
+        }
     }
+
+    // ---- Modes ---------------------------------------------------------------------------
+
+    private void OnAreaModeClick(object sender, RoutedEventArgs e) => SetMode(ScanMode.Area);
+
+    private void OnFullModeClick(object sender, RoutedEventArgs e) => SetMode(ScanMode.FullScreen);
+
+    private void SetMode(ScanMode mode)
+    {
+        var changed = mode != _mode;
+        _mode = mode;
+        UpdateModeButtons();
+        Root.Focus(FocusState.Programmatic);
+        if (!changed || _busy)
+        {
+            return;
+        }
+
+        _storage.Settings.LastScanMode = mode;
+        _storage.SaveSettings();
+
+        if (mode == ScanMode.FullScreen)
+        {
+            _ = ScanAllAsync();
+        }
+        else
+        {
+            ClearMarks();
+            HideCard();
+            ShowHint("", "Drag around a QR code", "Click for whole screen · Esc to cancel", ToDip(ScreenCapture.MonitorUnderCursor()));
+        }
+    }
+
+    private void UpdateModeButtons()
+    {
+        AreaModeButton.IsChecked = _mode == ScanMode.Area;
+        FullModeButton.IsChecked = _mode == ScanMode.FullScreen;
+        if (_mode == ScanMode.FullScreen)
+        {
+            HintText.Text = "Looking for QR codes…";
+            HintSecondary.Text = "Esc to cancel";
+        }
+    }
+
+    // ---- Full screen ---------------------------------------------------------------------
+
+    /// <summary>Decodes every monitor in parallel and outlines what it finds.</summary>
+    private async Task ScanAllAsync()
+    {
+        ClearMarks();
+        HideCard();
+        Selection.Visibility = Visibility.Collapsed;
+        SizeTag.Visibility = Visibility.Collapsed;
+        DimTop.Height = DimMiddle.Height = new GridLength(0);
+        DimLeft.Width = DimCenter.Width = new GridLength(0);
+        var monitor = ToDip(ScreenCapture.MonitorUnderCursor());
+        ShowHint("", "Looking for QR codes on every screen…", "Esc to cancel", monitor);
+
+        _busy = true;
+        IReadOnlyList<ScanResult> found;
+        try
+        {
+            found = await Task.Run(() => QrScanner.Scan(_shot.Image, _shot.MonitorRegions));
+        }
+        finally
+        {
+            _busy = false;
+        }
+
+        if (_closed || _mode != ScanMode.FullScreen)
+        {
+            return;
+        }
+
+        if (found.Count == 0)
+        {
+            ShowHint("", "No QR codes on screen", "Drag to scan an area · Esc to close", monitor);
+            await Task.Delay(1600);
+            if (!_closed && _mode == ScanMode.FullScreen && _found.Count == 0 && !_dragging && !_busy)
+            {
+                CloseOnce();
+            }
+
+            return;
+        }
+
+        _storage.AddToHistory(found);
+        _found = found;
+        DrawMarks();
+        ShowHint(
+            "",
+            found.Count == 1 ? "1 QR code found" : $"{found.Count} QR codes found",
+            found.Count == 1 ? "Enter to open · Esc to close" : "Tab to switch · Enter to open · Esc to close",
+            monitor);
+
+        if (_storage.Settings.AutoCopy)
+        {
+            ResultPresenter.Copy(found[0].Text);
+        }
+
+        if (found.Count == 1)
+        {
+            FocusCode(0);
+        }
+        else
+        {
+            ShowAllCodes();
+        }
+    }
+
+    private void DrawMarks()
+    {
+        var accent = (Brush)Application.Current.Resources["AccentFillColorDefaultBrush"];
+        var tint = new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(0x30, 0xFF, 0xFF, 0xFF));
+        for (var i = 0; i < _found.Count; i++)
+        {
+            var result = _found[i];
+            if (result.Corners.Count < 3)
+            {
+                continue;
+            }
+
+            var points = new PointCollection();
+            foreach (var corner in result.Corners)
+            {
+                points.Add(new Point(corner.X / _scale, corner.Y / _scale));
+            }
+
+            var outline = new Polygon
+            {
+                Points = points,
+                Stroke = accent,
+                StrokeThickness = 3,
+                StrokeLineJoin = PenLineJoin.Round,
+                Fill = tint,
+                IsHitTestVisible = false,
+            };
+            Marks.Children.Add(outline);
+            _outlines.Add(outline);
+
+            var index = i;
+            var chip = new Button
+            {
+                Content = (i + 1).ToString(System.Globalization.CultureInfo.CurrentCulture),
+                Width = ChipSize,
+                Height = ChipSize,
+                Padding = new Thickness(0),
+                CornerRadius = new CornerRadius(ChipSize / 2),
+                Style = (Style)Application.Current.Resources["AccentButtonStyle"],
+            };
+            AutomationProperties.SetName(chip, $"Code {i + 1}: {result.Content.Title}");
+            chip.Click += (_, _) =>
+            {
+                FocusCode(index);
+                Root.Focus(FocusState.Programmatic);
+            };
+
+            var host = new CursorGrid { CursorShape = InputSystemCursorShape.Arrow, Width = ChipSize, Height = ChipSize };
+            host.Children.Add(chip);
+            var bounds = ToDip(result.Bounds);
+            Canvas.SetLeft(host, bounds.X - (ChipSize / 2));
+            Canvas.SetTop(host, bounds.Y - (ChipSize / 2));
+            Marks.Children.Add(host);
+            _chips.Add(host);
+        }
+
+        UpdateCursorAreas();
+    }
+
+    private void ClearMarks()
+    {
+        Marks.Children.Clear();
+        _chips.Clear();
+        _outlines.Clear();
+        _found = [];
+        _focused = -1;
+        UpdateCursorAreas();
+    }
+
+    /// <summary>The list of every code in one card.</summary>
+    private void ShowAllCodes()
+    {
+        _focused = -1;
+        HighlightOutline();
+        _results.Clear();
+        for (var i = 0; i < _found.Count; i++)
+        {
+            _results.Add(new HistoryEntry { Text = _found[i].Text, ScannedAt = DateTimeOffset.Now, Number = i + 1 });
+        }
+
+        _selection = Union(_found.Where(r => r.Corners.Count > 0).Select(r => ToDip(r.Bounds)));
+        CardStatus.Text = _storage.Settings.AutoCopy ? "First code copied to clipboard" : "Click a number to pick a code";
+        ShowCard();
+    }
+
+    /// <summary>Shows one code's card next to it (Tab and the arrow keys move between codes).</summary>
+    private void FocusCode(int index)
+    {
+        if (_found.Count == 0)
+        {
+            return;
+        }
+
+        _focused = ((index % _found.Count) + _found.Count) % _found.Count;
+        HighlightOutline();
+        var result = _found[_focused];
+        _results.Clear();
+        _results.Add(new HistoryEntry { Text = result.Text, ScannedAt = DateTimeOffset.Now, Number = _found.Count > 1 ? _focused + 1 : null });
+
+        _selection = result.Corners.Count > 0 ? ToDip(result.Bounds) : ToDip(ScreenCapture.MonitorUnderCursor());
+        CardStatus.Text = _found.Count > 1 ? $"Code {_focused + 1} of {_found.Count} · Tab for the next" : "Drag to scan an area";
+        ShowCard();
+    }
+
+    private void HighlightOutline()
+    {
+        for (var i = 0; i < _outlines.Count; i++)
+        {
+            _outlines[i].StrokeThickness = i == _focused ? 5 : 3;
+            _outlines[i].Opacity = _focused < 0 || i == _focused ? 1 : 0.55;
+        }
+    }
+
+    private static Rect Union(IEnumerable<Rect> rects)
+    {
+        var union = Rect.Empty;
+        foreach (var r in rects)
+        {
+            union.Union(r);
+        }
+
+        return union.IsEmpty ? new Rect(0, 0, 0, 0) : union;
+    }
+
+    // ---- Area ----------------------------------------------------------------------------
 
     private void OnPointerPressed(object sender, PointerRoutedEventArgs e)
     {
@@ -215,9 +454,15 @@ public sealed partial class CaptureWindow : Window
             return;
         }
 
-        Card.Visibility = Visibility.Collapsed;
-        UpdateCursorAreas();
-        Hint.Opacity = 0;
+        if (_mode == ScanMode.FullScreen)
+        {
+            // Dragging always scans an area; switch to it.
+            ClearMarks();
+            SetMode(ScanMode.Area);
+        }
+
+        HideCard();
+        SetHintVisible(false);
         _start = point.Position;
         _dragging = true;
         Root.CapturePointer(e.Pointer);
@@ -253,7 +498,32 @@ public sealed partial class CaptureWindow : Window
 
     private void OnRightTapped(object sender, RightTappedRoutedEventArgs e) => CloseOnce();
 
-    private void OnCardPointerPressed(object sender, PointerRoutedEventArgs e) => e.Handled = true;
+    /// <summary>Clicks on the card and the hint bar must not start a selection.</summary>
+    private void OnChromePointerPressed(object sender, PointerRoutedEventArgs e) => e.Handled = true;
+
+    private void OnPreviewKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (_found.Count < 2)
+        {
+            return;
+        }
+
+        var shift = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift)
+            .HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
+        int? step = e.Key switch
+        {
+            VirtualKey.Tab => shift ? -1 : 1,
+            VirtualKey.Right or VirtualKey.Down => 1,
+            VirtualKey.Left or VirtualKey.Up => -1,
+            _ => null,
+        };
+
+        if (step is { } s)
+        {
+            FocusCode(_focused < 0 ? (s > 0 ? 0 : _found.Count - 1) : _focused + s);
+            e.Handled = true;
+        }
+    }
 
     private void OnKeyDown(object sender, KeyRoutedEventArgs e)
     {
@@ -304,7 +574,7 @@ public sealed partial class CaptureWindow : Window
 
         if (found.Count == 0)
         {
-            ShowHint("", "No QR code found here. Try a slightly larger box.");
+            ShowHint("\uE7BA", "No QR code found here. Try a slightly larger box.", "Click for whole screen · Esc to cancel", SelectionMonitor());
             return;
         }
 
@@ -328,6 +598,11 @@ public sealed partial class CaptureWindow : Window
     private void UpdateSelection(Rect rect)
     {
         rect.Intersect(new Rect(0, 0, Root.ActualWidth, Root.ActualHeight));
+        if (rect.IsEmpty)
+        {
+            rect = new Rect(_start, _start);
+        }
+
         _selection = rect;
         DimTop.Height = new GridLength(rect.Y);
         DimMiddle.Height = new GridLength(rect.Height);
@@ -346,12 +621,22 @@ public sealed partial class CaptureWindow : Window
         Canvas.SetTop(SizeTag, rect.Y >= 26 ? rect.Y - 26 : rect.Y + 6);
     }
 
-    private void ShowHint(string glyph, string text)
+    // ---- Hint, card and cursor -------------------------------------------------------------
+
+    private void ShowHint(string glyph, string text, string secondary, Rect monitor)
     {
         HintIcon.Glyph = glyph;
         HintText.Text = text;
-        Hint.Opacity = 1;
-        PlaceHint(ToDip(MonitorAt(new Point(_selection.X + (_selection.Width / 2), _selection.Y + (_selection.Height / 2)))));
+        HintSecondary.Text = secondary;
+        SetHintVisible(true);
+        PlaceHint(monitor);
+    }
+
+    private void SetHintVisible(bool visible)
+    {
+        Hint.Opacity = visible ? 1 : 0;
+        Hint.IsHitTestVisible = visible;
+        UpdateCursorAreas();
     }
 
     private void PlaceHint(Rect monitor)
@@ -359,6 +644,16 @@ public sealed partial class CaptureWindow : Window
         Hint.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         Canvas.SetLeft(Hint, monitor.X + ((monitor.Width - Hint.DesiredSize.Width) / 2));
         Canvas.SetTop(Hint, monitor.Y + 24);
+        UpdateCursorAreas();
+    }
+
+    private Rect SelectionMonitor() =>
+        ToDip(MonitorAt(new Point(_selection.X + (_selection.Width / 2), _selection.Y + (_selection.Height / 2))));
+
+    private void HideCard()
+    {
+        Card.Visibility = Visibility.Collapsed;
+        UpdateCursorAreas();
     }
 
     private void ShowCard()
@@ -369,7 +664,7 @@ public sealed partial class CaptureWindow : Window
         var width = Card.Width;
         var height = Card.DesiredSize.Height;
         var sel = _selection;
-        var monitor = ToDip(MonitorAt(new Point(sel.X + (sel.Width / 2), sel.Y + (sel.Height / 2))));
+        var monitor = SelectionMonitor();
 
         double x, y;
         if (sel.Bottom + Gap + height <= monitor.Bottom - Gap)
@@ -398,6 +693,42 @@ public sealed partial class CaptureWindow : Window
         Canvas.SetTop(Card, Math.Clamp(y, monitor.Top + Gap, Math.Max(monitor.Top + Gap, monitor.Bottom - height - Gap)));
         UpdateCursorAreas();
     }
+
+    /// <summary>Tells <see cref="OverlayCursor"/> where the arrow should show instead of the crosshair.</summary>
+    private void UpdateCursorAreas()
+    {
+        var areas = new List<Win32.RECT>();
+        if (Card.Visibility == Visibility.Visible)
+        {
+            areas.Add(ToScreen(Card));
+        }
+
+        if (Hint.IsHitTestVisible)
+        {
+            areas.Add(ToScreen(Hint));
+        }
+
+        areas.AddRange(_chips.Select(ToScreen));
+        OverlayCursor.SetArrowAreas([.. areas]);
+    }
+
+    /// <summary>Screen bounds (physical pixels) of an element placed on the overlay canvas.</summary>
+    private Win32.RECT ToScreen(FrameworkElement element)
+    {
+        var left = Canvas.GetLeft(element);
+        var top = Canvas.GetTop(element);
+        var width = double.IsNaN(element.Width) ? element.ActualWidth : element.Width;
+        var height = double.IsNaN(element.Height) ? element.ActualHeight : element.Height;
+        return new Win32.RECT
+        {
+            Left = _shot.Left + (int)Math.Floor(left * _scale),
+            Top = _shot.Top + (int)Math.Floor(top * _scale),
+            Right = _shot.Left + (int)Math.Ceiling((left + width) * _scale),
+            Bottom = _shot.Top + (int)Math.Ceiling((top + height) * _scale),
+        };
+    }
+
+    // ---- Actions -----------------------------------------------------------------------------
 
     private async void OnOpenClick(object sender, RoutedEventArgs e)
     {
@@ -470,4 +801,7 @@ public sealed partial class CaptureWindow : Window
         (r.Top - _shot.Top) / _scale,
         (r.Right - r.Left) / _scale,
         (r.Bottom - r.Top) / _scale);
+
+    /// <summary>A rectangle in screenshot pixels, in window DIPs.</summary>
+    private Rect ToDip(PixelRect r) => new(r.X / _scale, r.Y / _scale, r.Width / _scale, r.Height / _scale);
 }

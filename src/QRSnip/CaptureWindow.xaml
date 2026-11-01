@@ -13,6 +13,7 @@
         CursorShape="Cross"
         IsTabStop="True"
         KeyDown="OnKeyDown"
+        PreviewKeyDown="OnPreviewKeyDown"
         PointerMoved="OnPointerMoved"
         PointerPressed="OnPointerPressed"
         PointerReleased="OnPointerReleased"
@@ -40,6 +41,9 @@
         </Grid>
 
         <Canvas x:Name="Layer">
+            <!--  Full screen mode: an outline and a numbered chip for each code found.  -->
+            <Canvas x:Name="Marks" />
+
             <Border x:Name="Selection" BorderBrush="White" BorderThickness="2" CornerRadius="2" IsHitTestVisible="False" Visibility="Collapsed">
                 <Border BorderBrush="#66000000" BorderThickness="1" CornerRadius="1" />
             </Border>
@@ -48,12 +52,36 @@
                 <TextBlock x:Name="SizeText" FontSize="11" Foreground="White" />
             </Border>
 
-            <Border x:Name="Hint" Padding="16,10" Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}" BorderBrush="{ThemeResource SurfaceStrokeColorFlyoutBrush}" BorderThickness="1" CornerRadius="20" IsHitTestVisible="False">
-                <StackPanel Orientation="Horizontal" Spacing="10">
-                    <FontIcon x:Name="HintIcon" FontSize="16" Glyph="&#xED14;" />
-                    <TextBlock x:Name="HintText" VerticalAlignment="Center" Text="Drag around a QR code" />
-                    <TextBlock VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="Click for whole screen · Esc to cancel" />
-                </StackPanel>
+            <!--  Hint bar with the mode switch, like Snipping Tool's toolbar.  -->
+            <Border
+                x:Name="Hint"
+                Padding="6,6,16,6"
+                Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource SurfaceStrokeColorFlyoutBrush}"
+                BorderThickness="1"
+                CornerRadius="22"
+                PointerPressed="OnChromePointerPressed">
+                <local:CursorGrid CursorShape="Arrow">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <StackPanel Padding="2" Background="{ThemeResource ControlAltFillColorSecondaryBrush}" CornerRadius="18" Orientation="Horizontal" Spacing="2">
+                            <ToggleButton x:Name="AreaModeButton" Padding="12,5" AutomationProperties.Name="Area" Click="OnAreaModeClick" CornerRadius="16" ToolTipService.ToolTip="Drag around a code">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon FontSize="14" Glyph="&#xE8B3;" />
+                                    <TextBlock Text="Area" />
+                                </StackPanel>
+                            </ToggleButton>
+                            <ToggleButton x:Name="FullModeButton" Padding="12,5" AutomationProperties.Name="Full screen" Click="OnFullModeClick" CornerRadius="16" ToolTipService.ToolTip="Find every code on every screen">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon FontSize="14" Glyph="&#xE740;" />
+                                    <TextBlock Text="Full screen" />
+                                </StackPanel>
+                            </ToggleButton>
+                        </StackPanel>
+                        <FontIcon x:Name="HintIcon" FontSize="16" Glyph="&#xED14;" />
+                        <TextBlock x:Name="HintText" VerticalAlignment="Center" Text="Drag around a QR code" />
+                        <TextBlock x:Name="HintSecondary" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="Click for whole screen · Esc to cancel" />
+                    </StackPanel>
+                </local:CursorGrid>
             </Border>
 
             <Border
@@ -64,7 +92,7 @@
                 BorderBrush="{ThemeResource SurfaceStrokeColorFlyoutBrush}"
                 BorderThickness="1"
                 CornerRadius="{StaticResource OverlayCornerRadius}"
-                PointerPressed="OnCardPointerPressed"
+                PointerPressed="OnChromePointerPressed"
                 Visibility="Collapsed">
                 <local:CursorGrid CursorShape="Arrow">
                 <StackPanel>

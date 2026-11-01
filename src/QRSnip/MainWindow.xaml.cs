@@ -56,8 +56,13 @@ public sealed partial class MainWindow : Window
         HistoryList.ItemsSource = _storage.History;
         _storage.History.CollectionChanged += OnHistoryChanged;
         App.Current.UpdateStateChanged += OnUpdateStateChanged;
+        // The camera only runs while it can be seen: not minimized, hidden or in the tray.
+        AppWindow.Changed += (_, _) => UpdateCamera();
+
         Closed += (_, _) =>
         {
+            _ = CameraPage.StopAsync();
+
             // The window can be rebuilt later; don't let the history or the app keep this one alive.
             _storage.History.CollectionChanged -= OnHistoryChanged;
             App.Current.UpdateStateChanged -= OnUpdateStateChanged;
@@ -81,6 +86,7 @@ public sealed partial class MainWindow : Window
         Home,
         Settings,
         Pictures,
+        Camera,
     }
 
     public void ShowAndFocus()
@@ -100,6 +106,7 @@ public sealed partial class MainWindow : Window
 
         Activate();
         Win32.SetForegroundWindow(_hwnd);
+        UpdateCamera();
     }
 
     /// <summary>Hides without the fade-out animation, so it is gone before the screen is captured.</summary>
@@ -107,9 +114,18 @@ public sealed partial class MainWindow : Window
     {
         Win32.SetDwmInt(_hwnd, Win32.DWMWA_TRANSITIONS_FORCEDISABLED, 1);
         AppWindow.Hide();
+        UpdateCamera();
     }
 
-    public void Hide() => AppWindow.Hide();
+    /// <summary>Hides to the notification area; the next time it opens on the home page.</summary>
+    public void Hide()
+    {
+        ShowPage(Page.Home);
+        AppWindow.Hide();
+    }
+
+    /// <summary>Opens the camera page (tray menu, --camera).</summary>
+    public void OpenCamera() => ShowPage(Page.Camera);
 
     /// <summary>Really closes the window, releasing its visual tree.</summary>
     public void Release()
@@ -255,8 +271,27 @@ public sealed partial class MainWindow : Window
         HomePage.Visibility = page == Page.Home ? Visibility.Visible : Visibility.Collapsed;
         SettingsPage.Visibility = page == Page.Settings ? Visibility.Visible : Visibility.Collapsed;
         PicturePage.Visibility = page == Page.Pictures ? Visibility.Visible : Visibility.Collapsed;
+        CameraPage.Visibility = page == Page.Camera ? Visibility.Visible : Visibility.Collapsed;
         AppTitleBar.IsBackButtonVisible = page != Page.Home;
+        UpdateCamera();
     }
+
+    /// <summary>Runs the camera exactly when its page is shown in a visible, non-minimized window.</summary>
+    private void UpdateCamera()
+    {
+        var shouldRun = _page == Page.Camera && AppWindow.IsVisible
+            && AppWindow.Presenter is not OverlappedPresenter { State: OverlappedPresenterState.Minimized };
+        if (shouldRun && !CameraPage.IsRunning)
+        {
+            _ = CameraPage.StartAsync(_storage);
+        }
+        else if (!shouldRun && CameraPage.IsRunning)
+        {
+            _ = CameraPage.StopAsync();
+        }
+    }
+
+    private void OnCameraClick(object sender, RoutedEventArgs e) => ShowPage(Page.Camera);
 
     // ---- Pictures (#5) -------------------------------------------------------------------
 

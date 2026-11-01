@@ -8,6 +8,7 @@ QRSnip is a Windows app that reads QR codes from your screen. It is designed to 
 
 - **Your screen, only when you start a scan.** When you press the scan shortcut, click **New scan**, or choose *Scan QR code* from the tray, QRSnip captures an image of your displays so you can select an area. The image is held in memory only while the selection overlay is open and is discarded when it closes. It is never written to disk and never transmitted.
 - **Pictures, only the ones you give it.** When you open, drop or paste a picture (or open one with QRSnip from File Explorer), QRSnip reads it on your device to look for codes. It is kept in memory only while the results are shown, and is never copied, saved elsewhere or uploaded. Codes found are added to your history like screen scans.
+- **Your camera, only while the camera view is open.** When you choose **Camera** (or *Scan with camera*), QRSnip uses your webcam to look for QR codes. Frames are processed in memory only, a few times per second, and are never saved, recorded or sent. The camera turns off as soon as you leave the camera view, minimize QRSnip or close its window. Windows shows its camera indicator while it's on, and you can block access in **Settings › Privacy & security › Camera**.
 - **Your clipboard, only when you ask.** Text is copied to the clipboard when you click **Copy** or **Copy password**, press <kbd>Ctrl</kbd>+<kbd>C</kbd> in the overlay, or turn on *Copy results automatically*. A picture on the clipboard is read only when you press <kbd>Ctrl</kbd>+<kbd>V</kbd> in QRSnip.
 
 ## What QRSnip stores
@@ -30,7 +31,7 @@ These requests contain no personal data and nothing about what you scanned. Like
 ## What QRSnip does not do
 
 - It does not collect analytics, telemetry or usage data.
-- It does not send your screen, scans, history or settings anywhere. The update check above is its only network request. Links are opened in your default browser only when you click **Open link** or press <kbd>Enter</kbd>.
+- It does not send your screen, pictures, camera, scans, history or settings anywhere. The update check above is its only network request. Links are opened in your default browser only when you click **Open link** or press <kbd>Enter</kbd>.
 - It does not include advertising or third-party tracking.
 
 ## Children

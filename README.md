@@ -24,6 +24,7 @@ QR codes show up everywhere on a PC: in slides, PDFs, video calls, web pages and
 
 - **Snip to scan.** A frozen, dimmed view of your desktop just like Snipping Tool. Drag a box, or click once to scan the whole screen.
 - **Full screen mode.** <kbd>Shift</kbd>+<kbd>F10</kbd> finds every code on every monitor at once and numbers them. Works over slideshows and full-screen video.
+- **Camera.** Hold a printed code or a phone screen up to your webcam.
 - **Pictures too.** Open, drag in or paste (<kbd>Ctrl</kbd>+<kbd>V</kbd>) photos and screenshots; every code is outlined. Large phone photos work.
 - **Instant result card.** Shows next to your selection with **Open link**, **Copy** and, for Wi-Fi codes, **Copy password**.
 - **Understands what it reads.** Links, Wi-Fi, email, phone, SMS, contacts (vCard/MeCard) and map locations, plus plain text.
@@ -61,7 +62,8 @@ Requires Windows 10 version 2004 (build 19041) or later, x64 or ARM64.
 | Scan a whole screen | Click once without dragging |
 | Scan every screen at once | <kbd>Shift</kbd>+<kbd>F10</kbd>, **Full screen** in the overlay, or tray icon › *Scan full screen* |
 | Pick between several codes | Click a number, or <kbd>Tab</kbd> / arrow keys |
-| Scan a picture | **Open picture**, drop picture files on the window, or paste one with <kbd>Ctrl</kbd>+<kbd>V</kbd> |
+| Scan a picture | **Picture**, drop picture files on the window, or paste one with <kbd>Ctrl</kbd>+<kbd>V</kbd> |
+| Scan with the webcam | **Camera** on the home page, or tray icon › *Scan with camera* (`--camera`) |
 | Open the link | **Open link** or <kbd>Enter</kbd> |
 | Copy the text | **Copy** or <kbd>Ctrl</kbd>+<kbd>C</kbd> |
 | Cancel | <kbd>Esc</kbd> or right-click |
@@ -70,7 +72,7 @@ You can also start a scan from a shortcut or script with `QRSnip.exe --scan`, or
 
 ## Privacy
 
-QRSnip works offline; its only network request is the daily update check, which you can turn off. Screen captures are kept in memory only while you select an area and are never saved or sent anywhere. Scan history and settings are stored locally in `%LOCALAPPDATA%\QRSnip` and can be cleared or turned off in Settings. Links open only when you click **Open link**. See [PRIVACY.md](PRIVACY.md).
+QRSnip works offline; its only network request is the daily update check, which you can turn off. Screen captures, pictures and camera frames are kept in memory only while they're used and are never saved or sent anywhere. The camera is on only while the camera view is open. Scan history and settings are stored locally in `%LOCALAPPDATA%\QRSnip` and can be cleared or turned off in Settings. Links open only when you click **Open link**. See [PRIVACY.md](PRIVACY.md).
 
 ## Build from source
 

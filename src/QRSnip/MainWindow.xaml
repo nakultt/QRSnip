@@ -77,10 +77,16 @@
                                 <TextBlock Text="New scan" />
                             </StackPanel>
                         </Button>
-                        <Button x:Name="OpenPictureButton" Padding="16,8" Click="OnOpenPictureClick" ToolTipService.ToolTip="Scan a picture file. You can also drop pictures here or paste one with Ctrl+V.">
+                        <Button x:Name="OpenPictureButton" Padding="12,8" AutomationProperties.Name="Open picture" Click="OnOpenPictureClick" ToolTipService.ToolTip="Scan a picture file. You can also drop pictures here or paste one with Ctrl+V.">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon FontSize="16" Glyph="&#xE8B9;" />
-                                <TextBlock Text="Open picture" />
+                                <TextBlock Text="Picture" />
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="CameraButton" Padding="12,8" AutomationProperties.Name="Scan with camera" Click="OnCameraClick" ToolTipService.ToolTip="Scan a printed code or a phone screen with your webcam.">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon FontSize="16" Glyph="&#xE722;" />
+                                <TextBlock Text="Camera" />
                             </StackPanel>
                         </Button>
                     </StackPanel>
@@ -179,6 +185,9 @@
 
         <!--  Pictures that were opened, dropped or pasted  -->
         <local:PictureView x:Name="PicturePage" Grid.Row="2" Visibility="Collapsed" />
+
+        <!--  Webcam scanning  -->
+        <local:CameraView x:Name="CameraPage" Grid.Row="2" Visibility="Collapsed" />
 
         <!--  Settings  -->
         <ScrollViewer x:Name="SettingsPage" Grid.Row="2" Visibility="Collapsed">

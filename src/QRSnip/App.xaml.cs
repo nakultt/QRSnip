@@ -232,6 +232,13 @@ public partial class App : Application
         _capture.Show();
     }
 
+    /// <summary>Opens the main window on the camera page.</summary>
+    public void OpenCamera()
+    {
+        ShowMainWindow();
+        _mainWindow?.OpenCamera();
+    }
+
     /// <summary>Stops QRSnip completely: shortcut, notification-area icon and process.</summary>
     public void Quit()
     {
@@ -347,6 +354,7 @@ public partial class App : Application
         {
             MenuItem("Scan QR code", "", () => StartScan(), Hotkey),
             MenuItem("Scan full screen", "", () => StartScan(ScanMode.FullScreen), FullScreenHotkey),
+            MenuItem("Scan with camera", "", OpenCamera),
             new MenuFlyoutSeparator(),
         };
 
@@ -481,6 +489,10 @@ public partial class App : Application
         {
             ShowMainWindow();
             _mainWindow?.OpenPicturePaths(launch.Files);
+        }
+        else if (launch.Camera)
+        {
+            OpenCamera();
         }
         else if (launch.FullScreen)
         {

@@ -46,6 +46,9 @@ public sealed class AppSettings
 
     /// <summary>The newest version a notification was already shown for, so it's shown once.</summary>
     public string? NotifiedUpdateVersion { get; set; }
+
+    /// <summary>The camera picked last time (a MediaFrameSourceGroup id).</summary>
+    public string? CameraId { get; set; }
 }
 
 public sealed class HistoryEntry

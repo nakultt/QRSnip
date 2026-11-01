@@ -15,6 +15,7 @@ All notable changes to QRSnip are documented here. The format follows
 - **Quit QRSnip** in Settings.
 - Full screen mode (#4): <kbd>Shift</kbd>+<kbd>F10</kbd> (configurable), *Scan full screen* in the tray menu, or the **Area | Full screen** switch in the overlay. Every monitor is decoded in parallel; each code gets an outline and a numbered chip, with <kbd>Tab</kbd> and the arrow keys to move between them. The last mode used is remembered. `--scan-full` on the command line.
 - Scan pictures (#5): **Open picture**, drag and drop picture files (or a picture from a browser) onto the window, or paste with <kbd>Ctrl</kbd>+<kbd>V</kbd>. Each picture is shown with its codes outlined and the usual result cards; large phone photos are also tried at reduced sizes, and EXIF orientation is respected. `--file <path>` on the command line, and *Open with* in File Explorer for the Store version.
+- Scan with the camera (#6): **Camera** on the home page or *Scan with camera* in the tray menu (`--camera`). Live preview with a scan frame, camera picker (remembered), mirror and light toggles; the code is outlined and shown in the usual card, and each distinct code is added to history once. The camera turns off when you leave the view, minimize QRSnip or it goes to the tray; access denied, no camera and camera-in-use each show what to do.
 - Monitors that GDI captures as black (hardware-accelerated or full-screen apps) are captured again with Windows.Graphics.Capture.
 
 ### Fixed

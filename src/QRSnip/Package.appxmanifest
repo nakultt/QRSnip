@@ -78,5 +78,7 @@
 
   <Capabilities>
     <rescap:Capability Name="runFullTrust" />
+    <!--  Scan with camera: frames are decoded in memory and never saved or sent.  -->
+    <DeviceCapability Name="webcam" />
   </Capabilities>
 </Package>

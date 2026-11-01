@@ -69,6 +69,7 @@ on the bundle to catch problems early.
 | **Age ratings** | Complete the IARC questionnaire (no user interaction, no data sharing → typically 3+). |
 | **Packages** | Upload the `.msixupload`. |
 | **Store listing** | Copy from [store/listing.md](store/listing.md). Screenshots: `docs/store/1-scan-result.png`, `2-drag-to-scan.png`, `3-app.png`. Logo: `docs/images/logo-300.png`. |
+| **Properties › Product declarations / Camera** | QRSnip uses the webcam (`webcam` capability) only while the user scans with the camera; frames are processed on the device and not stored or transmitted. Mention this in the description (already in [store/listing.md](store/listing.md)). |
 | **Submission options › Restricted capabilities** | `runFullTrust` is required by every WinUI 3 desktop app. Justification: *"QRSnip is a WinUI 3 desktop app (Windows App SDK). Full trust is needed to capture the screen when the user starts a scan, register the user-chosen global shortcut and show a notification-area icon."* |
 
 Submit. Certification usually takes 1–3 business days. After that, put the Store link

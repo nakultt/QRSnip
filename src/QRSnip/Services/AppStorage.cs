@@ -56,9 +56,10 @@ public sealed class AppSettings
 
 public sealed class HistoryEntry
 {
-    public required string Text { get; init; }
+    // Not 'required': the XAML compiler generates a parameterless activator for this type.
+    public string Text { get; init; } = string.Empty;
 
-    public required DateTimeOffset ScannedAt { get; init; }
+    public DateTimeOffset ScannedAt { get; init; }
 
     [JsonIgnore]
     public ContentInfo Content => _content ??= ContentClassifier.Classify(Text);
@@ -117,7 +118,7 @@ public sealed class AppStorage
     {
         Settings = Read(SettingsPath, StorageJson.Default.AppSettings) ?? new AppSettings();
         var items = Settings.KeepHistory ? Read(HistoryPath, StorageJson.Default.ListHistoryEntry) : null;
-        History = new ObservableCollection<HistoryEntry>(items ?? []);
+        History = new ObservableCollection<HistoryEntry>((items ?? []).Where(e => e.Text.Length > 0));
     }
 
     /// <summary>%LOCALAPPDATA%\QRSnip (redirected into the package's own storage for Store installs).</summary>

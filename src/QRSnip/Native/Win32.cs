@@ -371,6 +371,16 @@ internal static unsafe partial class Win32
     public static partial int RegisterApplicationRestart(string? commandLine, uint flags);
 
     [LibraryImport("user32.dll")]
+    public static partial nint GetForegroundWindow();
+
+    [LibraryImport("user32.dll")]
+    public static partial uint GetWindowThreadProcessId(nint hwnd, out uint processId);
+
+    /// <summary>True if the window belongs to this process (e.g. one of our popups).</summary>
+    public static bool IsOwnWindow(nint hwnd) =>
+        hwnd != 0 && GetWindowThreadProcessId(hwnd, out var pid) != 0 && pid == (uint)Environment.ProcessId;
+
+    [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool EnumDisplayMonitors(nint hdc, nint clip, delegate* unmanaged<nint, nint, RECT*, nint, int> callback, nint data);
 

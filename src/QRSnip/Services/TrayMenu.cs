@@ -41,10 +41,17 @@ internal sealed partial class TrayMenu : Window
         _menu.Closed += (_, _) => AppWindow.Hide();
         Activated += (_, e) =>
         {
-            // Clicking anywhere else dismisses the menu, like a native context menu.
+            // Clicking anywhere else dismisses the menu, like a native context menu. Check once
+            // activation has settled, and ignore our own windows (the menu's popup or a submenu).
             if (e.WindowActivationState == WindowActivationState.Deactivated)
             {
-                _menu.Hide();
+                DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+                {
+                    if (_menu.IsOpen && !Win32.IsOwnWindow(Win32.GetForegroundWindow()))
+                    {
+                        _menu.Hide();
+                    }
+                });
             }
         };
         _root.Loaded += (_, _) => OpenMenu();

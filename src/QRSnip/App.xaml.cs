@@ -27,6 +27,7 @@ public partial class App : Application
     private DispatcherQueueTimer? _updateTimer;
     private UpdateService? _updates;
     private DateTimeOffset _mainHiddenAt;
+    private bool _scanStarting;
     private bool _exiting;
 
     public App(AppInstance instance, AppActivationArguments activation)
@@ -107,9 +108,11 @@ public partial class App : Application
 
         if (!manual)
         {
+            // An update found before a restart is looked up again right away to show its bar.
+            var pending = _updates.Available is null && ReleaseInfo.IsNewer(Storage.Settings.AvailableUpdateVersion, _updates.CurrentVersion);
             var last = Storage.Settings.LastUpdateCheck;
             if (!Storage.Settings.AutoCheckForUpdates || _capture is not null
-                || (last is { } at && DateTimeOffset.UtcNow - at < TimeSpan.FromDays(1)))
+                || (!pending && last is { } at && DateTimeOffset.UtcNow - at < TimeSpan.FromDays(1)))
             {
                 return UpdateCheckResult.UpToDate;
             }
@@ -119,6 +122,7 @@ public partial class App : Application
         if (result != UpdateCheckResult.Failed)
         {
             Storage.Settings.LastUpdateCheck = DateTimeOffset.UtcNow;
+            Storage.Settings.AvailableUpdateVersion = _updates.Available?.Version;
             Storage.SaveSettings();
         }
 
@@ -180,24 +184,24 @@ public partial class App : Application
     /// <summary>Opens the capture overlay, in the last used mode unless one is given.</summary>
     public async void StartScan(ScanMode? mode = null)
     {
-        if (_capture is not null || _exiting)
+        if (_capture is not null || _scanStarting || _exiting)
         {
             return;
         }
 
         var scanMode = mode ?? Storage.Settings.LastScanMode;
-
-        // Take the main window out of the picture before freezing the screen.
         var restoreMain = _mainWindow?.Visible == true;
-        if (restoreMain)
-        {
-            _mainWindow!.HideInstantly();
-            await Task.Delay(60);
-        }
-
         ScreenShot shot;
+        _scanStarting = true;
         try
         {
+            // Take the main window out of the picture before freezing the screen.
+            if (restoreMain)
+            {
+                _mainWindow!.HideInstantly();
+                await Task.Delay(60);
+            }
+
             shot = await ScreenCapture.CaptureAsync();
         }
         catch (InvalidOperationException)
@@ -209,10 +213,14 @@ public partial class App : Application
 
             return;
         }
-
-        if (_capture is not null || _exiting)
+        finally
         {
-            return; // another scan started while capturing
+            _scanStarting = false;
+        }
+
+        if (_exiting)
+        {
+            return;
         }
 
         _capture = new CaptureWindow(shot, Storage, scanMode);

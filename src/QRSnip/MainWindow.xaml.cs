@@ -25,6 +25,7 @@ public sealed partial class MainWindow : Window
     private bool _positioned;
     private bool _allowClose;
     private Page _page;
+    private long _lastDragOver;
 
     public MainWindow()
     {
@@ -357,10 +358,20 @@ public sealed partial class MainWindow : Window
             e.AcceptedOperation = DataPackageOperation.Copy;
             e.DragUIOverride.Caption = "Scan for QR codes";
             DropZone.Visibility = Visibility.Visible;
+            _lastDragOver = Environment.TickCount64;
         }
     }
 
-    private void OnDragLeave(object sender, DragEventArgs e) => DropZone.Visibility = Visibility.Collapsed;
+    private async void OnDragLeave(object sender, DragEventArgs e)
+    {
+        // DragLeave also bubbles up when the pointer moves between child elements; hide the
+        // highlight only if no DragOver follows, i.e. the drag really left the window.
+        await Task.Delay(120);
+        if (Environment.TickCount64 - _lastDragOver >= 110)
+        {
+            DropZone.Visibility = Visibility.Collapsed;
+        }
+    }
 
     private async void OnDrop(object sender, DragEventArgs e)
     {

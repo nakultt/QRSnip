@@ -43,4 +43,5 @@ First release.
 - Windows 11 design: WinUI 3, Mica, Fluent icons, light and dark theme.
 - Microsoft Store (MSIX) and portable builds for x64 and ARM64.
 
+[Unreleased]: https://github.com/nakultt/QRSnip/compare/v1.0.0...HEAD
 [1.0.0]: https://github.com/nakultt/QRSnip/releases/tag/v1.0.0

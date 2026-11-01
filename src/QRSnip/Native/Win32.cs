@@ -301,6 +301,30 @@ internal static unsafe partial class Win32
 
     public const uint WM_SETCURSOR = 0x0020;
     public const int HTCLIENT = 1;
+    public const int IDC_ARROW = 32512;
+    public const int IDC_CROSS = 32515;
+    public const int GCLP_HCURSOR = -12;
+    public const int GCW_ATOM = -32;
+
+    [LibraryImport("user32.dll")]
+    public static partial nint SetCursor(nint cursor);
+
+    [LibraryImport("user32.dll", EntryPoint = "LoadCursorW")]
+    public static partial nint LoadCursor(nint instance, nint name);
+
+    [LibraryImport("user32.dll", EntryPoint = "GetClassLongPtrW")]
+    public static partial nint GetClassLongPtr(nint hwnd, int index);
+
+    [LibraryImport("user32.dll", EntryPoint = "SetClassLongPtrW")]
+    public static partial nint SetClassLongPtr(nint hwnd, int index, nint value);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool EnumChildWindows(nint parent, delegate* unmanaged<nint, nint, int> callback, nint lParam);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool IsWindow(nint hwnd);
 
     [LibraryImport("comctl32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]

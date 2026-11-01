@@ -63,23 +63,17 @@ public sealed partial class CaptureWindow : Window
         Win32.SetDwmInt(_hwnd, Win32.DWMWA_TRANSITIONS_FORCEDISABLED, 1);
         Win32.SetDwmInt(_hwnd, Win32.DWMWA_WINDOW_CORNER_PREFERENCE, Win32.DWMWCP_DONOTROUND);
         Win32.SetDwmInt(_hwnd, Win32.DWMWA_BORDER_COLOR, unchecked((int)Win32.DWMWA_COLOR_NONE));
-        unsafe
-        {
-            Win32.SetWindowSubclass(_hwnd, &CursorSubclassProc, CursorSubclassId, 0);
-        }
 
         CoverDesktop();
 
         Root.SizeChanged += (_, _) => OnLayoutReady();
+        Card.SizeChanged += (_, _) => UpdateCursorAreas();
         Activated += OnActivated;
         Closed += (_, _) =>
         {
             _closed = true;
+            OverlayCursor.Detach();
             Shot.Source = null;
-            unsafe
-            {
-                Win32.RemoveWindowSubclass(_hwnd, &CursorSubclassProc, CursorSubclassId);
-            }
         };
     }
 
@@ -91,6 +85,7 @@ public sealed partial class CaptureWindow : Window
         Activate();
         CoverDesktop(); // again, in case a DPI change on activation resized us
         Win32.SetForegroundWindow(_hwnd);
+        OverlayCursor.Attach(_hwnd);
 
         var frames = 0;
         var revealed = false;
@@ -103,6 +98,7 @@ public sealed partial class CaptureWindow : Window
 
             revealed = true;
             Microsoft.UI.Xaml.Media.CompositionTarget.Rendering -= OnRendering;
+            OverlayCursor.HookTree(_hwnd); // XAML creates its input windows lazily
             Win32.SetDwmInt(_hwnd, Win32.DWMWA_CLOAK, 0);
             FadeIn(Dim, 150); // the undimmed screenshot matches the live screen, so this is seamless
         }
@@ -124,23 +120,6 @@ public sealed partial class CaptureWindow : Window
     }
 
     private const int RevealAfterFrames = 6;
-    private const nuint CursorSubclassId = 1;
-
-    /// <summary>
-    /// The window class has an arrow cursor, so on every mouse move Windows resets the cursor
-    /// to an arrow before WinUI sets the crosshair again, which flickers. Swallowing
-    /// WM_SETCURSOR in the client area leaves the cursor entirely to WinUI.
-    /// </summary>
-    [System.Runtime.InteropServices.UnmanagedCallersOnly]
-    private static nint CursorSubclassProc(nint hwnd, uint msg, nint wParam, nint lParam, nuint id, nuint data)
-    {
-        if (msg == Win32.WM_SETCURSOR && (lParam & 0xFFFF) == Win32.HTCLIENT)
-        {
-            return 1;
-        }
-
-        return Win32.DefSubclassProc(hwnd, msg, wParam, lParam);
-    }
 
     private static void FadeIn(UIElement element, int milliseconds)
     {
@@ -205,6 +184,27 @@ public sealed partial class CaptureWindow : Window
 
         _scale = _shot.Image.Width / Root.ActualWidth;
         PlaceHint(ToDip(ScreenCapture.MonitorUnderCursor()));
+        OverlayCursor.HookTree(_hwnd);
+    }
+
+    /// <summary>Tells <see cref="OverlayCursor"/> where the arrow should show instead of the crosshair.</summary>
+    private void UpdateCursorAreas()
+    {
+        OverlayCursor.SetArrowAreas(Card.Visibility == Visibility.Visible ? [ToScreen(Card)] : []);
+    }
+
+    /// <summary>Screen bounds (physical pixels) of an element placed on the overlay canvas.</summary>
+    private Win32.RECT ToScreen(FrameworkElement element)
+    {
+        var left = Canvas.GetLeft(element);
+        var top = Canvas.GetTop(element);
+        return new Win32.RECT
+        {
+            Left = _shot.Left + (int)Math.Floor(left * _scale),
+            Top = _shot.Top + (int)Math.Floor(top * _scale),
+            Right = _shot.Left + (int)Math.Ceiling((left + element.ActualWidth) * _scale),
+            Bottom = _shot.Top + (int)Math.Ceiling((top + element.ActualHeight) * _scale),
+        };
     }
 
     private void OnPointerPressed(object sender, PointerRoutedEventArgs e)
@@ -216,6 +216,7 @@ public sealed partial class CaptureWindow : Window
         }
 
         Card.Visibility = Visibility.Collapsed;
+        UpdateCursorAreas();
         Hint.Opacity = 0;
         _start = point.Position;
         _dragging = true;
@@ -395,6 +396,7 @@ public sealed partial class CaptureWindow : Window
 
         Canvas.SetLeft(Card, Math.Clamp(x, monitor.Left + Gap, Math.Max(monitor.Left + Gap, monitor.Right - width - Gap)));
         Canvas.SetTop(Card, Math.Clamp(y, monitor.Top + Gap, Math.Max(monitor.Top + Gap, monitor.Bottom - height - Gap)));
+        UpdateCursorAreas();
     }
 
     private async void OnOpenClick(object sender, RoutedEventArgs e)
@@ -443,6 +445,7 @@ public sealed partial class CaptureWindow : Window
         if (!_closed)
         {
             _closed = true;
+            OverlayCursor.Detach(); // while the window still exists, so the class cursors can be restored
             Close();
         }
     }

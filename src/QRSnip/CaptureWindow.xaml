@@ -18,7 +18,8 @@
         PointerReleased="OnPointerReleased"
         RightTapped="OnRightTapped">
 
-        <Image x:Name="Shot" Stretch="Fill" />
+        <!--  Not hit-testable, so the pointer is always over Root and its crosshair (#1).  -->
+        <Image x:Name="Shot" IsHitTestVisible="False" Stretch="Fill" />
 
         <!--  Everything outside the selection is dimmed.  -->
         <Grid x:Name="Dim" IsHitTestVisible="False" Opacity="0">

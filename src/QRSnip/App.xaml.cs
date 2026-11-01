@@ -1,6 +1,9 @@
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using Microsoft.Windows.AppLifecycle;
+using Microsoft.Windows.AppNotifications;
+using QRSnip.Native;
 using QRSnip.Services;
 using Windows.ApplicationModel.Activation;
 
@@ -9,11 +12,18 @@ namespace QRSnip;
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1001", Justification = "Lives for the whole process; the shell host is disposed in Quit().")]
 public partial class App : Application
 {
+    /// <summary>How long the main window may stay hidden before its visual tree is released.</summary>
+    private static readonly TimeSpan ReleaseWindowAfter = TimeSpan.FromMinutes(3);
+
     private readonly AppActivationArguments _initialActivation;
     private DispatcherQueue? _dispatcher;
     private ShellHost? _shell;
+    private NotificationService? _notifications;
+    private TrayMenu? _trayMenu;
     private MainWindow? _mainWindow;
     private CaptureWindow? _capture;
+    private DispatcherQueueTimer? _idleTimer;
+    private DateTimeOffset _mainHiddenAt;
     private bool _exiting;
 
     public App(AppInstance instance, AppActivationArguments activation)
@@ -39,15 +49,23 @@ public partial class App : Application
         _dispatcher = DispatcherQueue.GetForCurrentThread();
         DispatcherShutdownMode = DispatcherShutdownMode.OnExplicitShutdown;
 
-        _shell = new ShellHost(Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico"));
+        _notifications = new NotificationService(_dispatcher, () => _shell);
+        _notifications.Invoked += (_, action) => HandleNotificationAction(action);
+        _notifications.Register();
+
+        _shell = new ShellHost(Path.Combine(AppContext.BaseDirectory, "Assets"));
         _shell.RegisterHotkey(Storage.Settings.Hotkey);
         _shell.ShowTrayIcon(Storage.Settings.RunInBackground);
         _shell.ScanRequested += (_, _) => StartScan();
+        _shell.TrayClicked += (_, _) => OnTrayClicked();
+        _shell.MenuRequested += (_, pt) => ShowTrayMenu(pt);
         _shell.OpenRequested += (_, _) => ShowMainWindow();
         _shell.ExitRequested += (_, _) => Quit();
 
-        _mainWindow = new MainWindow();
-        _mainWindow.CloseRequested += OnMainWindowCloseRequested;
+        _idleTimer = _dispatcher.CreateTimer();
+        _idleTimer.Interval = ReleaseWindowAfter;
+        _idleTimer.IsRepeating = false;
+        _idleTimer.Tick += (_, _) => ReleaseIdleResources();
 
         HandleActivation(_initialActivation, initial: true);
     }
@@ -63,20 +81,24 @@ public partial class App : Application
         return _shell?.RegisterHotkey(preferred);
     }
 
-    public void ShowMainWindow() => _mainWindow?.ShowAndFocus();
+    public void ShowMainWindow()
+    {
+        _idleTimer?.Stop();
+        EnsureMainWindow().ShowAndFocus();
+    }
 
     public async void StartScan()
     {
-        if (_capture is not null || _mainWindow is null)
+        if (_capture is not null || _exiting)
         {
             return;
         }
 
         // Take the main window out of the picture before freezing the screen.
-        var restoreMain = _mainWindow.Visible;
+        var restoreMain = _mainWindow?.Visible == true;
         if (restoreMain)
         {
-            _mainWindow.HideInstantly();
+            _mainWindow!.HideInstantly();
             await Task.Delay(60);
         }
 
@@ -103,22 +125,32 @@ public partial class App : Application
             {
                 ShowMainWindow();
             }
+            else
+            {
+                // Back in the tray: hand the screenshot's memory back soon.
+                ScheduleIdleRelease(TimeSpan.FromSeconds(5));
+            }
         };
         _capture.Show();
     }
 
+    /// <summary>Stops QRSnip completely: shortcut, notification-area icon and process.</summary>
     public void Quit()
     {
         _exiting = true;
+        _idleTimer?.Stop();
         _capture?.Close();
+        _trayMenu?.Close();
+        _trayMenu = null;
         _shell?.Dispose();
         _shell = null;
-        _mainWindow?.Close();
+        _mainWindow?.Release();
+        _mainWindow = null;
         Exit();
     }
 
     /// <summary>Writes unhandled exceptions to %LOCALAPPDATA%\QRSnip\crash.log to make bug reports useful.</summary>
-    private static void LogCrash(Exception exception)
+    internal static void LogCrash(Exception exception)
     {
         try
         {
@@ -131,20 +163,181 @@ public partial class App : Application
         }
     }
 
+    private MainWindow EnsureMainWindow()
+    {
+        if (_mainWindow is null)
+        {
+            _mainWindow = new MainWindow();
+            _mainWindow.CloseRequested += OnMainWindowCloseRequested;
+        }
+
+        return _mainWindow;
+    }
+
     private void OnMainWindowCloseRequested(object? sender, EventArgs e)
     {
-        if (Storage.Settings.RunInBackground && !_exiting)
+        if (!Storage.Settings.RunInBackground || _exiting)
         {
-            _mainWindow?.Hide();
+            Quit();
+            return;
+        }
+
+        _mainWindow?.Hide();
+        _mainHiddenAt = DateTimeOffset.UtcNow;
+        ScheduleIdleRelease(ReleaseWindowAfter);
+
+        if (!Storage.Settings.ShownBackgroundNotice)
+        {
+            // Tell people once where QRSnip went, so they don't think it quit.
+            Storage.Settings.ShownBackgroundNotice = true;
+            Storage.SaveSettings();
+            var how = Hotkey is { } key ? $"Press {key} to scan" : "Scan from its icon";
+            _notifications?.Show(
+                "QRSnip is still running",
+                $"{how}, or find QRSnip in the notification area. You can change this in Settings.");
+        }
+    }
+
+    private void OnTrayClicked()
+    {
+        if (Storage.Settings.TrayClickStartsScan)
+        {
+            StartScan();
         }
         else
         {
-            Quit();
+            ShowMainWindow();
         }
+    }
+
+    private void ShowTrayMenu(Win32.POINT at)
+    {
+        _shell?.RefreshIcon();
+        try
+        {
+            _trayMenu ??= new TrayMenu();
+            _trayMenu.Show(at, BuildTrayMenu());
+        }
+        catch (Exception ex)
+        {
+            // Never leave people without a way to exit: fall back to the classic menu.
+            LogCrash(ex);
+            _trayMenu = null;
+            _shell?.ShowClassicMenu(at);
+        }
+    }
+
+    private List<MenuFlyoutItemBase> BuildTrayMenu()
+    {
+        var items = new List<MenuFlyoutItemBase>
+        {
+            MenuItem("Scan QR code", "", StartScan, Hotkey),
+            new MenuFlyoutSeparator(),
+        };
+
+        // The last three results, each with its actions.
+        var recent = Storage.History.Take(3).ToList();
+        foreach (var entry in recent)
+        {
+            var title = entry.Content.Title.Length > 40 ? entry.Content.Title[..39] + "…" : entry.Content.Title;
+            var sub = new MenuFlyoutSubItem { Text = title, Icon = new FontIcon { Glyph = entry.Glyph } };
+            if (entry.CanOpen)
+            {
+                sub.Items.Add(MenuItem(entry.OpenLabel, "", () => _ = ResultPresenter.OpenAsync(entry.Content)));
+            }
+
+            sub.Items.Add(MenuItem("Copy", "", () => ResultPresenter.Copy(entry.Text)));
+            if (entry.Content.Secret is { Length: > 0 } secret)
+            {
+                sub.Items.Add(MenuItem("Copy password", "", () => ResultPresenter.Copy(secret)));
+            }
+
+            items.Add(sub);
+        }
+
+        if (recent.Count > 0)
+        {
+            items.Add(new MenuFlyoutSeparator());
+        }
+
+        items.Add(MenuItem("Open QRSnip", "", ShowMainWindow));
+        items.Add(MenuItem("Exit", "", Quit));
+        return items;
+
+        static MenuFlyoutItem MenuItem(string text, string glyph, Action action, string? shortcut = null)
+        {
+            var item = new MenuFlyoutItem { Text = text, Icon = new FontIcon { Glyph = glyph } };
+            if (shortcut is not null)
+            {
+                item.KeyboardAcceleratorTextOverride = shortcut;
+            }
+
+            item.Click += (_, _) => action();
+            return item;
+        }
+    }
+
+    private void HandleNotificationAction(string action)
+    {
+        switch (action)
+        {
+            default:
+                ShowMainWindow();
+                break;
+        }
+    }
+
+    private void ScheduleIdleRelease(TimeSpan after)
+    {
+        if (_idleTimer is null || _exiting)
+        {
+            return;
+        }
+
+        _idleTimer.Stop();
+        _idleTimer.Interval = after;
+        _idleTimer.Start();
+    }
+
+    /// <summary>
+    /// While QRSnip waits in the tray, drop the hidden main window's visual tree (it is rebuilt
+    /// on demand) and give memory back to Windows, keeping the idle footprint small.
+    /// </summary>
+    private void ReleaseIdleResources()
+    {
+        if (_exiting || _capture is not null || _trayMenu?.IsOpen == true)
+        {
+            return;
+        }
+
+        if (_mainWindow is { Visible: false } hidden)
+        {
+            var hiddenFor = DateTimeOffset.UtcNow - _mainHiddenAt;
+            if (hiddenFor >= ReleaseWindowAfter)
+            {
+                _mainWindow = null;
+                hidden.CloseRequested -= OnMainWindowCloseRequested;
+                hidden.Release();
+            }
+            else
+            {
+                ScheduleIdleRelease(ReleaseWindowAfter - hiddenFor);
+            }
+        }
+
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+        GC.WaitForPendingFinalizers();
+        Win32.EmptyWorkingSet(Win32.GetCurrentProcess());
     }
 
     private void HandleActivation(AppActivationArguments args, bool initial)
     {
+        if (args.Kind == ExtendedActivationKind.AppNotification && args.Data is AppNotificationActivatedEventArgs notification)
+        {
+            HandleNotificationAction(NotificationService.ActionOf(notification));
+            return;
+        }
+
         var commandLine = args.Kind switch
         {
             ExtendedActivationKind.Launch => (args.Data as ILaunchActivatedEventArgs)?.Arguments ?? string.Empty,

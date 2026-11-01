@@ -185,6 +185,21 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Clicking the notification area icon" />
+                        <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Style="{StaticResource CaptionTextBlockStyle}" Text="What a left-click on QRSnip's icon does. Right-click always opens the menu." TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ComboBox x:Name="TrayClickCombo" Grid.Column="1" MinWidth="150" VerticalAlignment="Center" SelectionChanged="OnTrayClickChanged">
+                        <ComboBoxItem Content="Opens QRSnip" />
+                        <ComboBoxItem Content="Starts a scan" />
+                    </ComboBox>
+                </Grid>
+
+                <Grid Style="{StaticResource SettingRowStyle}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="Start with Windows" />
                         <TextBlock x:Name="StartupDescription" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Style="{StaticResource CaptionTextBlockStyle}" Text="Start quietly in the notification area when you sign in." TextWrapping="Wrap" />
                     </StackPanel>
@@ -214,6 +229,17 @@
                         <TextBlock Text="QRSnip" />
                         <TextBlock x:Name="VersionText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Style="{StaticResource CaptionTextBlockStyle}" />
                     </StackPanel>
+                </Grid>
+                <Grid Style="{StaticResource SettingRowStyle}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Quit QRSnip" />
+                        <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Style="{StaticResource CaptionTextBlockStyle}" Text="Stops QRSnip completely, including the shortcut and the notification area icon." TextWrapping="Wrap" />
+                    </StackPanel>
+                    <Button Grid.Column="1" MinWidth="96" VerticalAlignment="Center" Click="OnQuitClick" Content="Quit" />
                 </Grid>
                 <StackPanel Margin="0,4,0,0" Orientation="Horizontal" Spacing="4">
                     <HyperlinkButton Content="Source code" NavigateUri="https://github.com/nakultt/QRSnip" />

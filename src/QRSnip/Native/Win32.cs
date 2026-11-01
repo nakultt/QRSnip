@@ -339,4 +339,34 @@ internal static unsafe partial class Win32
 
     public static void SetDwmInt(nint hwnd, int attribute, int value) =>
         DwmSetWindowAttribute(hwnd, attribute, value, sizeof(int));
+
+    public const uint WM_SETTINGCHANGE = 0x001A;
+    public const uint WM_DISPLAYCHANGE = 0x007E;
+    public const uint WM_DPICHANGED = 0x02E0;
+    public const uint NIF_INFO = 0x10;
+    public const uint NIIF_USER = 0x4;
+    public const uint NIIF_LARGE_ICON = 0x20;
+    public const int SM_CXSMICON = 49;
+    public const uint WS_EX_NOACTIVATE = 0x08000000;
+    public const int GWL_EXSTYLE = -20;
+
+    [LibraryImport("user32.dll")]
+    public static partial int GetSystemMetricsForDpi(int index, uint dpi);
+
+    [LibraryImport("user32.dll")]
+    public static partial uint GetDpiForSystem();
+
+    [LibraryImport("user32.dll", EntryPoint = "FindWindowW", StringMarshalling = StringMarshalling.Utf16)]
+    public static partial nint FindWindow(string? className, string? windowName);
+
+    [LibraryImport("kernel32.dll")]
+    public static partial nint GetCurrentProcess();
+
+    /// <summary>Trims the working set (psapi's EmptyWorkingSet, exported by kernel32).</summary>
+    [LibraryImport("kernel32.dll", EntryPoint = "K32EmptyWorkingSet")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool EmptyWorkingSet(nint process);
+
+    [LibraryImport("kernel32.dll", StringMarshalling = StringMarshalling.Utf16)]
+    public static partial int RegisterApplicationRestart(string? commandLine, uint flags);
 }

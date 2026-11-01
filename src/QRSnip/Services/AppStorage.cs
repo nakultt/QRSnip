@@ -18,6 +18,12 @@ public sealed class AppSettings
 
     /// <summary>Remember scanned codes on this device.</summary>
     public bool KeepHistory { get; set; } = true;
+
+    /// <summary>A left-click on the notification-area icon starts a scan instead of opening the window.</summary>
+    public bool TrayClickStartsScan { get; set; }
+
+    /// <summary>The "QRSnip is still running" notice has been shown once.</summary>
+    public bool ShownBackgroundNotice { get; set; }
 }
 
 public sealed class HistoryEntry

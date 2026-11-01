@@ -18,6 +18,7 @@ public sealed partial class MainWindow : Window
     private readonly nint _hwnd;
     private bool _loadingSettings;
     private bool _positioned;
+    private bool _allowClose;
 
     public MainWindow()
     {
@@ -37,12 +38,23 @@ public sealed partial class MainWindow : Window
 
         AppWindow.Closing += (_, e) =>
         {
+            if (_allowClose)
+            {
+                return;
+            }
+
             e.Cancel = true;
             CloseRequested?.Invoke(this, EventArgs.Empty);
         };
 
         HistoryList.ItemsSource = _storage.History;
         _storage.History.CollectionChanged += OnHistoryChanged;
+        Closed += (_, _) =>
+        {
+            // The window can be rebuilt later; don't let the history keep this one alive.
+            _storage.History.CollectionChanged -= OnHistoryChanged;
+            HistoryList.ItemsSource = null;
+        };
         UpdateEmptyState();
         BuildHotkeyHint();
 
@@ -79,6 +91,13 @@ public sealed partial class MainWindow : Window
     }
 
     public void Hide() => AppWindow.Hide();
+
+    /// <summary>Really closes the window, releasing its visual tree.</summary>
+    public void Release()
+    {
+        _allowClose = true;
+        Close();
+    }
 
     private int Scale(int dip) => (int)Math.Round(dip * Win32.GetDpiForWindow(_hwnd) / 96.0);
 
@@ -185,6 +204,8 @@ public sealed partial class MainWindow : Window
         HotkeyCombo.SelectedItem = App.Current.Hotkey;
         AutoCopyToggle.IsOn = _storage.Settings.AutoCopy;
         BackgroundToggle.IsOn = _storage.Settings.RunInBackground;
+        TrayClickCombo.SelectedIndex = _storage.Settings.TrayClickStartsScan ? 1 : 0;
+        TrayClickCombo.IsEnabled = _storage.Settings.RunInBackground;
         HistoryToggle.IsOn = _storage.Settings.KeepHistory;
         try
         {
@@ -219,8 +240,22 @@ public sealed partial class MainWindow : Window
         _storage.Settings.RunInBackground = BackgroundToggle.IsOn;
         _storage.Settings.KeepHistory = HistoryToggle.IsOn;
         _storage.SaveSettings();
+        TrayClickCombo.IsEnabled = BackgroundToggle.IsOn;
         App.Current.ApplyBackgroundSetting();
     }
+
+    private void OnTrayClickChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_loadingSettings)
+        {
+            return;
+        }
+
+        _storage.Settings.TrayClickStartsScan = TrayClickCombo.SelectedIndex == 1;
+        _storage.SaveSettings();
+    }
+
+    private void OnQuitClick(object sender, RoutedEventArgs e) => App.Current.Quit();
 
     private void OnHotkeyChanged(object sender, SelectionChangedEventArgs e)
     {

@@ -41,7 +41,7 @@
   <ItemGroup>
     <Content Include="Assets\**\*.png" Exclude="Assets\AppLogo.png" />
     <Content Include="Assets\AppLogo.png" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="Assets\AppIcon.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\AppIcon.ico;Assets\TrayIcon-*.ico" CopyToOutputDirectory="PreserveNewest" />
     <Manifest Include="$(ApplicationManifest)" />
   </ItemGroup>
 

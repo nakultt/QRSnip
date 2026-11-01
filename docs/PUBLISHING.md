@@ -32,6 +32,21 @@ the build is ready; these steps need your Partner Center account.
 4. Paste them into [`src/QRSnip/Package.appxmanifest`](../src/QRSnip/Package.appxmanifest),
    replacing the placeholders `NakulT.QRSnip`, `CN=Nakul T` and `Nakul T`. Commit the change.
 
+### Before the first submission: check the packaged build
+
+Install the bundle locally (`./build/package.ps1 -SkipPortable -SkipInstaller`, then sign the
+`.msix` for your machine or use *Deploy* in Visual Studio) on x64 and ARM64 and check:
+
+- [ ] *Start with Windows* uses the `StartupTask`: sign out and in; QRSnip starts in the tray
+      (and appears in *Settings › Apps › Startup*).
+- [ ] `qrsnip --scan` works from a terminal (app execution alias).
+- [ ] Settings and history survive an update (install a higher version over it) and are gone
+      after uninstalling. Packaged desktop apps write `%LOCALAPPDATA%\QRSnip` into the
+      package's own storage, which Windows keeps on update and removes on uninstall.
+- [ ] Both architectures install from the same bundle.
+- [ ] The [Windows App Certification Kit](https://learn.microsoft.com/windows/uwp/debug-test-perf/windows-app-certification-kit)
+      passes: `appcert.exe test -appxpackagepath <bundle> -reportoutputpath wack.xml`.
+
 ### 2. Build the upload package
 
 ```powershell
@@ -177,3 +192,72 @@ download them from the run's `qrsnip-x64-preview` artifact to try a change.
 
 For the Store channel, submit two versions and use *Check for updates* in the older one
 (a package flight in Partner Center keeps this away from everyone else).
+
+## winget
+
+Two ways to get QRSnip into `winget`:
+
+- **From the Store:** once QRSnip is live, `winget install QRSnip --source msstore` finds it
+  automatically. Nothing to publish.
+- **From GitHub releases (community repository):** a manifest in
+  [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs) pointing at the
+  installers, so `winget install NakulT.QRSnip` works. The release workflow keeps it current.
+
+### First submission (once)
+
+After a release with installers exists:
+
+```powershell
+winget install wingetcreate
+wingetcreate new https://github.com/nakultt/QRSnip/releases/download/vX.Y.Z/QRSnipApp-win-x64-Setup.exe `
+                 https://github.com/nakultt/QRSnip/releases/download/vX.Y.Z/QRSnipApp-win-arm64-Setup.exe
+```
+
+Answer the prompts with:
+
+| Field | Value |
+|---|---|
+| PackageIdentifier | `NakulT.QRSnip` |
+| Publisher / PackageName | `Nakul T` / `QRSnip` |
+| InstallerType | `exe` |
+| Scope | `user` |
+| Silent / SilentWithProgress switches | `--silent` |
+| ProductCode (AppsAndFeaturesEntries) | `QRSnipApp` |
+| License / ShortDescription | `MIT` / the Store short description |
+
+Submit the pull request it opens. Once it's merged:
+
+1. Create a classic personal access token with the `public_repo` scope (wingetcreate forks
+   winget-pkgs with it) and add it as the **`WINGET_TOKEN`** secret.
+2. Add the repository variable **`WINGET_PACKAGE_ID`** = `NakulT.QRSnip`. This turns on the
+   `winget` job: every non-pre-release release then runs `wingetcreate update --submit`.
+
+## Code signing
+
+Without a signature, Windows SmartScreen warns on the first download of `Setup.exe` and the
+portable `QRSnip.exe` (updates after that install silently). The Store signs its own
+packages, so this only matters for GitHub downloads.
+
+The release workflow can sign with [Azure Artifact Signing](https://learn.microsoft.com/azure/artifact-signing/)
+(formerly Trusted Signing; [SignPath Foundation](https://signpath.org) is a free alternative for
+open source). When configured it signs `QRSnip.exe` before it is zipped and packed, and `vpk`
+signs the installer and the files it installs, all through `package.ps1 -SignTemplate`.
+
+1. Create an Artifact Signing account and a *Public Trust* certificate profile (identity
+   validation is required).
+2. In Microsoft Entra ID, register an app with a **federated credential** for this
+   repository (GitHub Actions, entity *Environment* or *Branch* as you prefer), and give it the
+   *Artifact Signing Certificate Profile Signer* role on the account.
+3. Add secrets **`AZURE_CLIENT_ID`**, **`AZURE_TENANT_ID`**, **`AZURE_SUBSCRIPTION_ID`**, and variables
+   **`ARTIFACT_SIGNING_ENDPOINT`** (e.g. `https://weu.codesigning.azure.net/`),
+   **`ARTIFACT_SIGNING_ACCOUNT`** and **`ARTIFACT_SIGNING_PROFILE`**. Setting the endpoint turns
+   signing on.
+
+Locally, pass any signing command with `{{file}}` where the file goes:
+
+```powershell
+./build/package.ps1 -SignTemplate '"C:\path\signtool.exe" sign /fd SHA256 /a /tr http://timestamp.digicert.com /td SHA256 {{file}}'
+```
+
+A sideloaded MSIX with an `.appinstaller` file isn't produced: the GitHub installer already
+gives non-Store users a Start menu entry, clean uninstall and automatic updates.

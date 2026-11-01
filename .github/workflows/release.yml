@@ -21,6 +21,9 @@ permissions:
 jobs:
   package:
     runs-on: windows-latest
+    permissions:
+      contents: write
+      id-token: write # only used to sign in to Azure for code signing, when configured
     steps:
       - uses: actions/checkout@v7
 
@@ -47,9 +50,43 @@ jobs:
           }
           exit 0
 
+      # Optional code signing with Azure Artifact Signing (formerly Trusted Signing), so the
+      # installer and QRSnip.exe don't trigger SmartScreen. Skipped until the
+      # ARTIFACT_SIGNING_ENDPOINT variable exists; see docs/PUBLISHING.md.
+      - name: Sign in to Azure
+        if: vars.ARTIFACT_SIGNING_ENDPOINT != ''
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Set up code signing
+        id: signing
+        if: vars.ARTIFACT_SIGNING_ENDPOINT != ''
+        shell: pwsh
+        env:
+          ENDPOINT: ${{ vars.ARTIFACT_SIGNING_ENDPOINT }}
+          ACCOUNT: ${{ vars.ARTIFACT_SIGNING_ACCOUNT }}
+          PROFILE: ${{ vars.ARTIFACT_SIGNING_PROFILE }}
+        run: |
+          $dir = (New-Item -ItemType Directory -Force (Join-Path $env:RUNNER_TEMP 'signing')).FullName
+          Invoke-WebRequest https://www.nuget.org/api/v2/package/Microsoft.ArtifactSigning.Client/1.0.146 -OutFile "$dir\client.zip"
+          Expand-Archive "$dir\client.zip" "$dir\client" -Force
+          @{ Endpoint = $env:ENDPOINT; CodeSigningAccountName = $env:ACCOUNT; CertificateProfileName = $env:PROFILE } |
+            ConvertTo-Json | Set-Content "$dir\metadata.json"
+          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
+            Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $signtool) { throw 'signtool.exe not found.' }
+          $template = "`"$($signtool.FullName)`" sign /fd SHA256 /tr http://timestamp.acs.microsoft.com /td SHA256 " +
+            "/dlib `"$dir\client\bin\x64\Azure.CodeSigning.Dlib.dll`" /dmdf `"$dir\metadata.json`" {{file}}"
+          "template=$template" >> $env:GITHUB_OUTPUT
+
       - name: Package
         shell: pwsh
-        run: ./build/package.ps1 -Output artifacts
+        env:
+          SIGN_TEMPLATE: ${{ steps.signing.outputs.template }}
+        run: ./build/package.ps1 -Output artifacts -SignTemplate $env:SIGN_TEMPLATE
 
       - uses: actions/upload-artifact@v7
         with:
@@ -84,6 +121,27 @@ jobs:
             dotnet @upload
             if ($LASTEXITCODE) { throw "Uploading the win-$arch installer failed." }
           }
+
+  # Keeps `winget install NakulT.QRSnip` current. Skipped until the WINGET_PACKAGE_ID variable
+  # exists, which you add after the first manual submission (see docs/PUBLISHING.md).
+  winget:
+    needs: package
+    if: vars.WINGET_PACKAGE_ID != '' && github.event_name == 'release' && !github.event.release.prerelease
+    runs-on: windows-latest
+    steps:
+      - name: Submit the new version to winget-pkgs
+        shell: pwsh
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+          PACKAGE_ID: ${{ vars.WINGET_PACKAGE_ID }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          $version = $env:TAG.TrimStart('v')
+          $base = "${{ github.server_url }}/${{ github.repository }}/releases/download/$env:TAG"
+          Invoke-WebRequest https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
+          ./wingetcreate.exe update $env:PACKAGE_ID --version $version --submit --token $env:WINGET_TOKEN `
+            --urls "$base/QRSnipApp-win-x64-Setup.exe|x64" "$base/QRSnipApp-win-arm64-Setup.exe|arm64"
+          if ($LASTEXITCODE) { throw 'wingetcreate failed.' }
 
   store:
     needs: package

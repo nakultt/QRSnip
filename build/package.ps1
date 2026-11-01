@@ -26,8 +26,9 @@ param(
     [switch]$SkipPortable,
     [switch]$SkipInstaller,
     [switch]$SkipStore,
-    # Optional signing command for the installer and the files it installs, run by vpk with
-    # {{file}} replaced by the file(s) to sign. See docs/PUBLISHING.md.
+    # Optional signing command line with {{file}} where the file(s) go, e.g. signtool with
+    # Azure Artifact Signing. Signs QRSnip.exe (portable and installed) and the installer.
+    # See docs/PUBLISHING.md.
     [string]$SignTemplate
 )
 
@@ -63,6 +64,12 @@ function Get-ChangelogSection([string]$Version) {
     return ($section -join "`n").Trim()
 }
 
+function Invoke-Sign([string]$File) {
+    $command = $SignTemplate.Replace('{{file}}', "`"$File`"")
+    Invoke-Expression "& $command"
+    if ($LASTEXITCODE) { throw "Signing $File failed." }
+}
+
 if (-not $SkipInstaller -or -not $SkipPortable) {
     if (-not $SkipInstaller) {
         dotnet tool restore
@@ -78,6 +85,11 @@ if (-not $SkipInstaller -or -not $SkipPortable) {
         $publish = Join-Path $Output "publish-$arch"
         dotnet publish $project -c Release -r "win-$arch" -p:Platform=$arch -p:Portable=true -o $publish
         if ($LASTEXITCODE) { throw "Portable $arch build failed." }
+
+        if ($SignTemplate) {
+            # Sign QRSnip's own executable before it goes into the zip and the installer.
+            Invoke-Sign (Join-Path $publish 'QRSnip.exe')
+        }
 
         if (-not $SkipInstaller) {
             # Packs (and signs, if asked) the published files, so do it before zipping them.

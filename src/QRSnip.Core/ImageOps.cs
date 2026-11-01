@@ -32,6 +32,58 @@ public static class ImageOps
 
         return image;
     }
+
+    /// <summary>
+    /// Returns a copy that fits in <paramref name="maxSide"/> pixels (area averaging), or the
+    /// image itself if it already fits. Used for previews of large photos.
+    /// </summary>
+    public static BgraImage Shrink(BgraImage image, int maxSide)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+        ArgumentOutOfRangeException.ThrowIfLessThan(maxSide, 1);
+        var longest = Math.Max(image.Width, image.Height);
+        if (longest <= maxSide)
+        {
+            return image;
+        }
+
+        var w = Math.Max(1, (int)((long)image.Width * maxSide / longest));
+        var h = Math.Max(1, (int)((long)image.Height * maxSide / longest));
+        var output = new byte[w * h * 4];
+        var src = image.Pixels;
+        for (var y = 0; y < h; y++)
+        {
+            var y0 = (int)((long)y * image.Height / h);
+            var y1 = Math.Max(y0 + 1, (int)((long)(y + 1) * image.Height / h));
+            for (var x = 0; x < w; x++)
+            {
+                var x0 = (int)((long)x * image.Width / w);
+                var x1 = Math.Max(x0 + 1, (int)((long)(x + 1) * image.Width / w));
+                int b = 0, g = 0, r = 0, a = 0;
+                for (var sy = y0; sy < y1; sy++)
+                {
+                    var row = sy * image.Stride;
+                    for (var sx = x0; sx < x1; sx++)
+                    {
+                        var p = row + (sx * 4);
+                        b += src[p];
+                        g += src[p + 1];
+                        r += src[p + 2];
+                        a += src[p + 3];
+                    }
+                }
+
+                var n = (y1 - y0) * (x1 - x0);
+                var d = ((y * w) + x) * 4;
+                output[d] = (byte)(b / n);
+                output[d + 1] = (byte)(g / n);
+                output[d + 2] = (byte)(r / n);
+                output[d + 3] = (byte)(a / n);
+            }
+        }
+
+        return new BgraImage(output, w, h, w * 4);
+    }
 }
 
 /// <summary>

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--  Results for pictures that were opened, dropped or pasted: each picture with its codes outlined.  -->
+<UserControl
+    x:Class="QRSnip.PictureView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Grid RowSpacing="8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid Margin="24,4,20,0">
+            <TextBlock x:Name="Heading" Style="{StaticResource SubtitleTextBlockStyle}" Text="Pictures" />
+            <TextBlock x:Name="StatusText" HorizontalAlignment="Right" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Style="{StaticResource CaptionTextBlockStyle}" />
+        </Grid>
+
+        <ScrollViewer Grid.Row="1">
+            <StackPanel x:Name="Sections" Padding="20,4,20,20" Spacing="20" />
+        </ScrollViewer>
+
+        <StackPanel x:Name="Loading" Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12" Visibility="Collapsed">
+            <ProgressRing HorizontalAlignment="Center" IsActive="True" />
+            <TextBlock x:Name="LoadingText" HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="Reading picture…" />
+        </StackPanel>
+    </Grid>
+</UserControl>

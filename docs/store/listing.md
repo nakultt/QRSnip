@@ -20,6 +20,7 @@ Perfect for QR codes in slides, PDFs, video calls, websites and chat screenshots
 
 • Snip to scan: a frozen, dimmed view of your desktop just like Snipping Tool
 • Click once to scan an entire screen, or press Shift+F10 to find every code on every monitor
+• Scan pictures too: open, drag in or paste photos and screenshots
 • Understands links, Wi-Fi, email, phone, SMS, contacts and map locations
 • Reads several codes at once, including tiny and light-on-dark codes
 • Also reads Data Matrix, Aztec and PDF417
@@ -40,6 +41,7 @@ First release.
 - Drag a box around any QR code on screen to read it instantly
 - Click once to scan a whole screen, or find every code on all monitors with Shift+F10
 - Open links, copy text or copy Wi-Fi passwords from the result card
+- Scan QR codes in pictures: open, drag and drop, or paste a photo or screenshot
 - Reads several codes at once, including tiny and inverted codes
 - Global F10 shortcut (configurable) and tray icon
 - Private on-device history; works fully offline

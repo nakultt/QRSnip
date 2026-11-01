@@ -14,6 +14,7 @@ All notable changes to QRSnip are documented here. The format follows
 - GitHub installer (`QRSnipApp-win-x64-Setup.exe` / `arm64`): per-user, no admin rights, Start menu entry, uninstall from *Installed apps*.
 - **Quit QRSnip** in Settings.
 - Full screen mode (#4): <kbd>Shift</kbd>+<kbd>F10</kbd> (configurable), *Scan full screen* in the tray menu, or the **Area | Full screen** switch in the overlay. Every monitor is decoded in parallel; each code gets an outline and a numbered chip, with <kbd>Tab</kbd> and the arrow keys to move between them. The last mode used is remembered. `--scan-full` on the command line.
+- Scan pictures (#5): **Open picture**, drag and drop picture files (or a picture from a browser) onto the window, or paste with <kbd>Ctrl</kbd>+<kbd>V</kbd>. Each picture is shown with its codes outlined and the usual result cards; large phone photos are also tried at reduced sizes, and EXIF orientation is respected. `--file <path>` on the command line, and *Open with* in File Explorer for the Store version.
 - Monitors that GDI captures as black (hardware-accelerated or full-screen apps) are captured again with Windows.Graphics.Capture.
 
 ### Fixed

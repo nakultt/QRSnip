@@ -2,9 +2,14 @@ using System.Collections.Specialized;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
+using QRSnip.Core;
 using QRSnip.Native;
 using QRSnip.Services;
+using Windows.ApplicationModel.DataTransfer;
 using Windows.Graphics;
+using Windows.Storage;
+using Windows.Storage.Pickers;
 using WinRT.Interop;
 
 namespace QRSnip;
@@ -19,6 +24,7 @@ public sealed partial class MainWindow : Window
     private bool _loadingSettings;
     private bool _positioned;
     private bool _allowClose;
+    private Page _page;
 
     public MainWindow()
     {
@@ -69,6 +75,13 @@ public sealed partial class MainWindow : Window
     }
 
     public event EventHandler? CloseRequested;
+
+    private enum Page
+    {
+        Home,
+        Settings,
+        Pictures,
+    }
 
     public void ShowAndFocus()
     {
@@ -226,16 +239,151 @@ public sealed partial class MainWindow : Window
         }
 
         _loadingSettings = false;
-        ShowSettings(true);
+        ShowPage(Page.Settings);
     }
 
-    private void OnBackRequested(TitleBar sender, object args) => ShowSettings(false);
+    private void OnBackRequested(TitleBar sender, object args) => ShowPage(Page.Home);
 
-    private void ShowSettings(bool show)
+    private void ShowPage(Page page)
     {
-        HomePage.Visibility = show ? Visibility.Collapsed : Visibility.Visible;
-        SettingsPage.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
-        AppTitleBar.IsBackButtonVisible = show;
+        if (_page == Page.Pictures && page != Page.Pictures)
+        {
+            PicturePage.Clear();
+        }
+
+        _page = page;
+        HomePage.Visibility = page == Page.Home ? Visibility.Visible : Visibility.Collapsed;
+        SettingsPage.Visibility = page == Page.Settings ? Visibility.Visible : Visibility.Collapsed;
+        PicturePage.Visibility = page == Page.Pictures ? Visibility.Visible : Visibility.Collapsed;
+        AppTitleBar.IsBackButtonVisible = page != Page.Home;
+    }
+
+    // ---- Pictures (#5) -------------------------------------------------------------------
+
+    /// <summary>Scans pictures and shows the results page.</summary>
+    internal async Task OpenPicturesAsync(IReadOnlyList<IImageSource> sources)
+    {
+        if (sources.Count == 0)
+        {
+            return;
+        }
+
+        ShowPage(Page.Pictures);
+        await PicturePage.ShowAsync(sources, _storage);
+    }
+
+    /// <summary>Scans picture files given on the command line (--file).</summary>
+    public async void OpenPicturePaths(IReadOnlyList<string> paths)
+    {
+        var sources = new List<IImageSource>();
+        foreach (var path in paths)
+        {
+            try
+            {
+                sources.Add(await FileImageSource.FromPathAsync(path));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or System.Runtime.InteropServices.COMException)
+            {
+                sources.Add(new FailedImageSource(Path.GetFileName(path), ex));
+            }
+        }
+
+        await OpenPicturesAsync(sources);
+    }
+
+    /// <summary>Scans picture files opened with QRSnip from File Explorer (Store version).</summary>
+    public void OpenPictureFiles(IReadOnlyList<StorageFile> files) =>
+        _ = OpenPicturesAsync(files.Select(f => (IImageSource)new FileImageSource(f)).ToList());
+
+    private async void OnOpenPictureClick(object sender, RoutedEventArgs e)
+    {
+        var picker = new FileOpenPicker
+        {
+            ViewMode = PickerViewMode.Thumbnail,
+            SuggestedStartLocation = PickerLocationId.PicturesLibrary,
+        };
+        foreach (var extension in LaunchArguments.PictureExtensions)
+        {
+            picker.FileTypeFilter.Add(extension);
+        }
+
+        InitializeWithWindow.Initialize(picker, _hwnd);
+        var files = await picker.PickMultipleFilesAsync();
+        if (files.Count > 0)
+        {
+            await OpenPicturesAsync(files.Select(f => (IImageSource)new FileImageSource(f)).ToList());
+        }
+    }
+
+    private void OnDragOver(object sender, DragEventArgs e)
+    {
+        if (e.DataView.Contains(StandardDataFormats.StorageItems) || e.DataView.Contains(StandardDataFormats.Bitmap))
+        {
+            e.AcceptedOperation = DataPackageOperation.Copy;
+            e.DragUIOverride.Caption = "Scan for QR codes";
+            DropZone.Visibility = Visibility.Visible;
+        }
+    }
+
+    private void OnDragLeave(object sender, DragEventArgs e) => DropZone.Visibility = Visibility.Collapsed;
+
+    private async void OnDrop(object sender, DragEventArgs e)
+    {
+        DropZone.Visibility = Visibility.Collapsed;
+        var deferral = e.GetDeferral();
+        List<IImageSource> sources;
+        try
+        {
+            sources = await PicturesInAsync(e.DataView, "Dropped picture");
+        }
+        finally
+        {
+            deferral.Complete();
+        }
+
+        if (sources.Count > 0)
+        {
+            await OpenPicturesAsync(sources);
+        }
+        else
+        {
+            Flash("Drop picture files (PNG, JPG, …) to scan them");
+        }
+    }
+
+    private async void OnPasteInvoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        var content = Clipboard.GetContent();
+        if (!content.Contains(StandardDataFormats.Bitmap) && !content.Contains(StandardDataFormats.StorageItems))
+        {
+            return; // nothing to scan; leave the keystroke alone
+        }
+
+        args.Handled = true;
+        await OpenPicturesAsync(await PicturesInAsync(content, "Pasted picture"));
+    }
+
+    /// <summary>Picture files in dropped or pasted data, or the bitmap itself (e.g. from a screenshot).</summary>
+    private static async Task<List<IImageSource>> PicturesInAsync(DataPackageView data, string name)
+    {
+        var sources = new List<IImageSource>();
+        if (data.Contains(StandardDataFormats.StorageItems))
+        {
+            foreach (var item in await data.GetStorageItemsAsync())
+            {
+                if (item is StorageFile file && LaunchArguments.IsPicturePath(file.Name))
+                {
+                    sources.Add(new FileImageSource(file));
+                }
+            }
+        }
+
+        if (sources.Count == 0 && data.Contains(StandardDataFormats.Bitmap))
+        {
+            sources.Add(new StreamImageSource(await data.GetBitmapAsync(), name));
+        }
+
+        return sources;
     }
 
     private void OnSettingToggled(object sender, RoutedEventArgs e)

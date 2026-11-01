@@ -730,27 +730,19 @@ public sealed partial class CaptureWindow : Window
 
     // ---- Actions -----------------------------------------------------------------------------
 
-    private async void OnOpenClick(object sender, RoutedEventArgs e)
+    private async void OnResultAction(object? sender, ResultActionEventArgs e)
     {
-        if (EntryOf(sender) is { } entry)
+        switch (e.Action)
         {
-            await OpenAndCloseAsync(entry);
-        }
-    }
-
-    private void OnCopyClick(object sender, RoutedEventArgs e)
-    {
-        if (EntryOf(sender) is { } entry)
-        {
-            CopyAndClose(entry.Text, "Copied to clipboard");
-        }
-    }
-
-    private void OnCopySecretClick(object sender, RoutedEventArgs e)
-    {
-        if (EntryOf(sender) is { Content.Secret: { } secret })
-        {
-            CopyAndClose(secret, "Password copied");
+            case ResultAction.Open:
+                await OpenAndCloseAsync(e.Entry);
+                break;
+            case ResultAction.Copy:
+                CopyAndClose(e.Entry.Text, "Copied to clipboard");
+                break;
+            case ResultAction.CopySecret when e.Entry.Content.Secret is { } secret:
+                CopyAndClose(secret, "Password copied");
+                break;
         }
     }
 
@@ -780,8 +772,6 @@ public sealed partial class CaptureWindow : Window
             Close();
         }
     }
-
-    private static HistoryEntry? EntryOf(object sender) => (sender as FrameworkElement)?.DataContext as HistoryEntry;
 
     /// <summary>Bounds of the monitor containing a point given in window DIPs, in virtual-screen pixels.</summary>
     private Win32.RECT MonitorAt(Point dip)

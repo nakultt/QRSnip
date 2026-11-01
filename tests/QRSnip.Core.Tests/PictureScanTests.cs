@@ -93,6 +93,18 @@ public class PictureScanTests
     }
 
     [Fact]
+    public void Shrinks_large_pictures_for_previews_keeping_the_aspect_ratio()
+    {
+        var large = Canvas(4000, 3000, shade: 0x80);
+
+        var preview = ImageOps.Shrink(large, 1600);
+
+        Assert.Equal((1600, 1200), (preview.Width, preview.Height));
+        Assert.All(preview.Pixels.Where((_, i) => i % 4 != 3), v => Assert.Equal(0x80, v));
+        Assert.Same(preview, ImageOps.Shrink(preview, 1600));
+    }
+
+    [Fact]
     public void Downscale_averages_pixel_blocks()
     {
         byte[] luma =

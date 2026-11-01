@@ -457,6 +457,14 @@ public partial class App : Application
             return;
         }
 
+        if (args.Kind == ExtendedActivationKind.File && args.Data is IFileActivatedEventArgs opened)
+        {
+            // "Open with" QRSnip in File Explorer (Store version).
+            ShowMainWindow();
+            _mainWindow?.OpenPictureFiles(opened.Files.OfType<Windows.Storage.StorageFile>().ToList());
+            return;
+        }
+
         var launch = args.Kind switch
         {
             ExtendedActivationKind.Launch => LaunchArguments.Parse((args.Data as ILaunchActivatedEventArgs)?.Arguments),
@@ -469,7 +477,12 @@ public partial class App : Application
             launch = launch.Merge(LaunchArguments.Parse(Environment.GetCommandLineArgs().Skip(1)));
         }
 
-        if (launch.FullScreen)
+        if (launch.Files.Count > 0)
+        {
+            ShowMainWindow();
+            _mainWindow?.OpenPicturePaths(launch.Files);
+        }
+        else if (launch.FullScreen)
         {
             StartScan(ScanMode.FullScreen);
         }

@@ -49,6 +49,24 @@
         <uap5:Extension Category="windows.startupTask">
           <uap5:StartupTask TaskId="QRSnipStartup" Enabled="false" DisplayName="QRSnip" />
         </uap5:Extension>
+        <!--  "Open with: QRSnip" for pictures in File Explorer. Portable builds take the file switch instead (see README).  -->
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="qrsnip.picture">
+            <uap:SupportedFileTypes>
+              <uap:FileType>.png</uap:FileType>
+              <uap:FileType>.jpg</uap:FileType>
+              <uap:FileType>.jpeg</uap:FileType>
+              <uap:FileType>.jfif</uap:FileType>
+              <uap:FileType>.bmp</uap:FileType>
+              <uap:FileType>.gif</uap:FileType>
+              <uap:FileType>.tif</uap:FileType>
+              <uap:FileType>.tiff</uap:FileType>
+              <uap:FileType>.webp</uap:FileType>
+              <uap:FileType>.heic</uap:FileType>
+              <uap:FileType>.heif</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
         <uap5:Extension Category="windows.appExecutionAlias">
           <uap5:AppExecutionAlias>
             <uap5:ExecutionAlias Alias="qrsnip.exe" />

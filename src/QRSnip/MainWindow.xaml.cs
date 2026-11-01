@@ -49,17 +49,23 @@ public sealed partial class MainWindow : Window
 
         HistoryList.ItemsSource = _storage.History;
         _storage.History.CollectionChanged += OnHistoryChanged;
+        App.Current.UpdateStateChanged += OnUpdateStateChanged;
         Closed += (_, _) =>
         {
-            // The window can be rebuilt later; don't let the history keep this one alive.
+            // The window can be rebuilt later; don't let the history or the app keep this one alive.
             _storage.History.CollectionChanged -= OnHistoryChanged;
+            App.Current.UpdateStateChanged -= OnUpdateStateChanged;
             HistoryList.ItemsSource = null;
         };
         UpdateEmptyState();
         BuildHotkeyHint();
 
         var version = typeof(App).Assembly.GetName().Version ?? new Version(1, 0);
-        VersionText.Text = $"Version {version.ToString(3)} · MIT License";
+        var channel = App.Current.Updates?.ChannelName;
+        VersionText.Text = channel is null
+            ? $"Version {version.ToString(3)} · MIT License"
+            : $"Version {version.ToString(3)} · {channel} · MIT License";
+        ShowUpdate();
     }
 
     public event EventHandler? CloseRequested;
@@ -207,6 +213,7 @@ public sealed partial class MainWindow : Window
         TrayClickCombo.SelectedIndex = _storage.Settings.TrayClickStartsScan ? 1 : 0;
         TrayClickCombo.IsEnabled = _storage.Settings.RunInBackground;
         HistoryToggle.IsOn = _storage.Settings.KeepHistory;
+        AutoUpdateToggle.IsOn = _storage.Settings.AutoCheckForUpdates;
         try
         {
             StartupToggle.IsOn = await StartupService.IsEnabledAsync();
@@ -239,6 +246,7 @@ public sealed partial class MainWindow : Window
         _storage.Settings.AutoCopy = AutoCopyToggle.IsOn;
         _storage.Settings.RunInBackground = BackgroundToggle.IsOn;
         _storage.Settings.KeepHistory = HistoryToggle.IsOn;
+        _storage.Settings.AutoCheckForUpdates = AutoUpdateToggle.IsOn;
         _storage.SaveSettings();
         TrayClickCombo.IsEnabled = BackgroundToggle.IsOn;
         App.Current.ApplyBackgroundSetting();
@@ -256,6 +264,80 @@ public sealed partial class MainWindow : Window
     }
 
     private void OnQuitClick(object sender, RoutedEventArgs e) => App.Current.Quit();
+
+    private void OnUpdateStateChanged(object? sender, EventArgs e) => ShowUpdate();
+
+    /// <summary>Shows or hides the "Update available" bar for the update found by the last check.</summary>
+    private void ShowUpdate()
+    {
+        var updates = App.Current.Updates;
+        if (updates?.Available is not { } update)
+        {
+            UpdateBar.IsOpen = false;
+            return;
+        }
+
+        UpdateBar.Severity = InfoBarSeverity.Informational;
+        UpdateBar.Title = update.Mandatory ? "Required update" : "Update available";
+        UpdateBar.Message = updates.CanInstall
+            ? $"QRSnip {update.Version} is ready to install."
+            : $"QRSnip {update.Version} is available. Download it to replace this portable copy.";
+        UpdateBar.IsClosable = !update.Mandatory;
+        UpdateNotes.Text = update.Notes;
+        UpdateNotes.Visibility = update.Notes.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        UpdateButton.Content = updates.CanInstall ? "Restart to update" : "Download";
+        UpdateBar.IsOpen = true;
+    }
+
+    private void OnInstallUpdateClick(object sender, RoutedEventArgs e) => InstallUpdate();
+
+    /// <summary>Downloads and installs the update with progress in the bar (or opens the download page).</summary>
+    public async void InstallUpdate()
+    {
+        if (App.Current.Updates is not { Available: not null } updates || !UpdateButton.IsEnabled)
+        {
+            return;
+        }
+
+        UpdateButton.IsEnabled = false;
+        if (updates.CanInstall)
+        {
+            UpdateProgress.Visibility = Visibility.Visible;
+            UpdateProgress.IsIndeterminate = true;
+        }
+
+        var progress = new Progress<int>(p =>
+        {
+            UpdateProgress.IsIndeterminate = false;
+            UpdateProgress.Value = p;
+        });
+
+        var done = await App.Current.InstallUpdateAsync(progress);
+        UpdateProgress.Visibility = Visibility.Collapsed;
+        UpdateButton.IsEnabled = true;
+        if (!done && updates.CanInstall)
+        {
+            UpdateBar.Severity = InfoBarSeverity.Warning;
+            UpdateBar.Message = "The update couldn't be installed right now. Try again later.";
+        }
+    }
+
+    private async void OnCheckUpdatesClick(object sender, RoutedEventArgs e)
+    {
+        CheckUpdatesButton.IsEnabled = false;
+        UpdateRing.IsActive = true;
+        UpdateStatus.Text = "Checking for updates…";
+
+        var result = await App.Current.CheckForUpdatesAsync(manual: true);
+        UpdateRing.IsActive = false;
+        CheckUpdatesButton.IsEnabled = true;
+        UpdateStatus.Text = result switch
+        {
+            UpdateCheckResult.Available => $"QRSnip {App.Current.Updates?.Available?.Version} is available.",
+            UpdateCheckResult.UpToDate => "You're up to date.",
+            _ => "Couldn't check for updates. Check your internet connection and try again.",
+        };
+    }
 
     private void OnHotkeyChanged(object sender, SelectionChangedEventArgs e)
     {

@@ -24,6 +24,15 @@ public sealed class AppSettings
 
     /// <summary>The "QRSnip is still running" notice has been shown once.</summary>
     public bool ShownBackgroundNotice { get; set; }
+
+    /// <summary>Look for a new version at most once a day (never during a scan).</summary>
+    public bool AutoCheckForUpdates { get; set; } = true;
+
+    /// <summary>When the last successful update check ran.</summary>
+    public DateTimeOffset? LastUpdateCheck { get; set; }
+
+    /// <summary>The newest version a notification was already shown for, so it's shown once.</summary>
+    public string? NotifiedUpdateVersion { get; set; }
 }
 
 public sealed class HistoryEntry
@@ -77,8 +86,7 @@ public sealed class AppStorage
 {
     private const int MaxHistory = 100;
 
-    private readonly string _folder = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "QRSnip");
+    private readonly string _folder = DataFolder;
 
     public AppStorage()
     {
@@ -86,6 +94,10 @@ public sealed class AppStorage
         var items = Settings.KeepHistory ? Read(HistoryPath, StorageJson.Default.ListHistoryEntry) : null;
         History = new ObservableCollection<HistoryEntry>(items ?? []);
     }
+
+    /// <summary>%LOCALAPPDATA%\QRSnip (redirected into the package's own storage for Store installs).</summary>
+    public static string DataFolder { get; } = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "QRSnip");
 
     public AppSettings Settings { get; }
 

@@ -7,6 +7,9 @@ updates:
     groups:
       windows-app-sdk:
         patterns: ["Microsoft.WindowsAppSDK*", "Microsoft.Windows.SDK.*"]
+      # The Velopack library and the vpk tool (.config/dotnet-tools.json) must match.
+      velopack:
+        patterns: ["Velopack", "vpk"]
 
   - package-ecosystem: github-actions
     directory: /

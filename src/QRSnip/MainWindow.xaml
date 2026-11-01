@@ -13,6 +13,7 @@
     <Grid x:Name="Root">
         <Grid.RowDefinitions>
             <RowDefinition Height="48" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -23,8 +24,27 @@
             </TitleBar.IconSource>
         </TitleBar>
 
+        <!--  Update available (shown above the home page and Settings)  -->
+        <InfoBar
+            x:Name="UpdateBar"
+            Grid.Row="1"
+            Margin="20,0,20,8"
+            IsOpen="False"
+            Severity="Informational"
+            Title="Update available">
+            <InfoBar.ActionButton>
+                <Button x:Name="UpdateButton" Click="OnInstallUpdateClick" Content="Restart to update" Style="{StaticResource AccentButtonStyle}" />
+            </InfoBar.ActionButton>
+            <InfoBar.Content>
+                <StackPanel Margin="0,0,0,12" Spacing="8">
+                    <TextBlock x:Name="UpdateNotes" MaxLines="6" Style="{StaticResource CaptionTextBlockStyle}" TextTrimming="CharacterEllipsis" TextWrapping="Wrap" />
+                    <ProgressBar x:Name="UpdateProgress" Maximum="100" Visibility="Collapsed" />
+                </StackPanel>
+            </InfoBar.Content>
+        </InfoBar>
+
         <!--  Home  -->
-        <Grid x:Name="HomePage" Grid.Row="1" Padding="20,4,20,12" RowSpacing="12">
+        <Grid x:Name="HomePage" Grid.Row="2" Padding="20,4,20,12" RowSpacing="12">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
@@ -139,7 +159,7 @@
         </Grid>
 
         <!--  Settings  -->
-        <ScrollViewer x:Name="SettingsPage" Grid.Row="1" Visibility="Collapsed">
+        <ScrollViewer x:Name="SettingsPage" Grid.Row="2" Visibility="Collapsed">
             <StackPanel Padding="20,4,20,20" Spacing="4">
                 <TextBlock Margin="4,0,0,12" Style="{StaticResource SubtitleTextBlockStyle}" Text="Settings" />
 
@@ -230,6 +250,33 @@
                         <TextBlock x:Name="VersionText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Style="{StaticResource CaptionTextBlockStyle}" />
                     </StackPanel>
                 </Grid>
+                <Grid Style="{StaticResource SettingRowStyle}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Updates" />
+                        <TextBlock x:Name="UpdateStatus" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Style="{StaticResource CaptionTextBlockStyle}" Text="See if a newer version of QRSnip is available." TextWrapping="Wrap" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Orientation="Horizontal" Spacing="12">
+                        <ProgressRing x:Name="UpdateRing" Width="20" Height="20" IsActive="False" />
+                        <Button x:Name="CheckUpdatesButton" Click="OnCheckUpdatesClick" Content="Check for updates" />
+                    </StackPanel>
+                </Grid>
+
+                <Grid Style="{StaticResource SettingRowStyle}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Automatically check for updates" />
+                        <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Style="{StaticResource CaptionTextBlockStyle}" Text="At most once a day and never during a scan. Only asks GitHub or the Microsoft Store for the latest version." TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ToggleSwitch x:Name="AutoUpdateToggle" Grid.Column="1" MinWidth="0" OffContent="" OnContent="" Toggled="OnSettingToggled" />
+                </Grid>
+
                 <Grid Style="{StaticResource SettingRowStyle}">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />

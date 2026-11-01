@@ -23,6 +23,8 @@ public partial class App : Application
     private MainWindow? _mainWindow;
     private CaptureWindow? _capture;
     private DispatcherQueueTimer? _idleTimer;
+    private DispatcherQueueTimer? _updateTimer;
+    private UpdateService? _updates;
     private DateTimeOffset _mainHiddenAt;
     private bool _exiting;
 
@@ -43,6 +45,11 @@ public partial class App : Application
     public AppStorage Storage { get; } = new();
 
     public string? Hotkey => _shell?.Hotkey;
+
+    internal UpdateService? Updates => _updates;
+
+    /// <summary>An update check finished or an update became available.</summary>
+    public event EventHandler? UpdateStateChanged;
 
     protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
     {
@@ -67,7 +74,77 @@ public partial class App : Application
         _idleTimer.IsRepeating = false;
         _idleTimer.Tick += (_, _) => ReleaseIdleResources();
 
+        // Automatic update checks: shortly after start, then hourly (each one checks at most once a day).
+        _updates = new UpdateService(() => WinRT.Interop.WindowNative.GetWindowHandle(EnsureMainWindow()));
+        _updateTimer = _dispatcher.CreateTimer();
+        _updateTimer.Interval = TimeSpan.FromSeconds(45);
+        _updateTimer.IsRepeating = true;
+        _updateTimer.Tick += (timer, _) =>
+        {
+            timer.Interval = TimeSpan.FromHours(1);
+            _ = CheckForUpdatesAsync(manual: false);
+        };
+        _updateTimer.Start();
+
         HandleActivation(_initialActivation, initial: true);
+    }
+
+    /// <summary>
+    /// Looks for a new version. Automatic checks run at most once a day, never during a scan,
+    /// and only when turned on; failures are silent (manual checks report them).
+    /// </summary>
+    internal async Task<UpdateCheckResult> CheckForUpdatesAsync(bool manual)
+    {
+        if (_updates is null || _exiting)
+        {
+            return UpdateCheckResult.Failed;
+        }
+
+        if (!manual)
+        {
+            var last = Storage.Settings.LastUpdateCheck;
+            if (!Storage.Settings.AutoCheckForUpdates || _capture is not null
+                || (last is { } at && DateTimeOffset.UtcNow - at < TimeSpan.FromDays(1)))
+            {
+                return UpdateCheckResult.UpToDate;
+            }
+        }
+
+        var result = await _updates.CheckAsync();
+        if (result != UpdateCheckResult.Failed)
+        {
+            Storage.Settings.LastUpdateCheck = DateTimeOffset.UtcNow;
+            Storage.SaveSettings();
+        }
+
+        UpdateStateChanged?.Invoke(this, EventArgs.Empty);
+
+        // In the tray: tell people once per version with a Windows notification.
+        if (result == UpdateCheckResult.Available && _updates.Available is { } update && !manual
+            && _mainWindow?.Visible != true && Storage.Settings.NotifiedUpdateVersion != update.Version)
+        {
+            Storage.Settings.NotifiedUpdateVersion = update.Version;
+            Storage.SaveSettings();
+            var firstLine = update.Notes.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault(l => l.StartsWith('•'));
+            _notifications?.Show(
+                $"QRSnip {update.Version} is available",
+                firstLine?.TrimStart('•', ' ') ?? "Restart QRSnip to get the latest version.",
+                _updates.CanInstall ? "Restart to update" : "Download",
+                UpdateAction);
+        }
+
+        return result;
+    }
+
+    /// <summary>Installs the available update and restarts (or opens the download page for portable copies).</summary>
+    public async Task<bool> InstallUpdateAsync(IProgress<int>? progress)
+    {
+        if (_updates is null || _capture is not null || _exiting)
+        {
+            return false;
+        }
+
+        return await _updates.InstallAsync(progress, _ => PrepareForRestart(), restartInBackground: _mainWindow?.Visible != true);
     }
 
     /// <summary>Called when the user changes "Keep running in the background".</summary>
@@ -138,6 +215,7 @@ public partial class App : Application
     public void Quit()
     {
         _exiting = true;
+        _updateTimer?.Stop();
         _idleTimer?.Stop();
         _capture?.Close();
         _trayMenu?.Close();
@@ -161,6 +239,21 @@ public partial class App : Application
         catch (IOException)
         {
         }
+    }
+
+    private const string UpdateAction = "update";
+
+    /// <summary>The updater restarts the process itself; release the shortcut and tray icon first.</summary>
+    private void PrepareForRestart()
+    {
+        _exiting = true;
+        _updateTimer?.Stop();
+        _idleTimer?.Stop();
+        _capture?.Close();
+        _trayMenu?.Close();
+        _trayMenu = null;
+        _shell?.Dispose();
+        _shell = null;
     }
 
     private MainWindow EnsureMainWindow()
@@ -281,6 +374,10 @@ public partial class App : Application
     {
         switch (action)
         {
+            case UpdateAction:
+                ShowMainWindow();
+                _mainWindow?.InstallUpdate();
+                break;
             default:
                 ShowMainWindow();
                 break;

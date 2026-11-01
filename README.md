@@ -29,6 +29,7 @@ QR codes show up everywhere on a PC: in slides, PDFs, video calls, web pages and
 - **Global shortcut.** <kbd>F10</kbd> by default; switch to <kbd>Ctrl</kbd>+<kbd>F10</kbd>, <kbd>Win</kbd>+<kbd>Shift</kbd>+<kbd>Q</kbd> or <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>Q</kbd> in Settings.
 - **Lives in the tray.** Closing the window keeps the shortcut working. Optional start with Windows.
 - **History**, stored only on your device. Wi-Fi passwords are never shown in the list.
+- **Stays up to date.** Checks for a new version at most once a day and installs it in place, from the Microsoft Store or GitHub depending on where you got QRSnip.
 - **Multi-monitor and mixed-DPI aware.** Covers every display, crisp at any scaling.
 - **Native Windows 11 look.** WinUI 3, Mica, Fluent icons, light and dark theme, your accent colour.
 - Supports QR codes, plus Data Matrix, Aztec and PDF417.
@@ -43,8 +44,9 @@ QR codes show up everywhere on a PC: in slides, PDFs, video calls, web pages and
 
 | | |
 |---|---|
+| **Installer** | Download `QRSnipApp-win-x64-Setup.exe` (or `arm64`) from [Releases](https://github.com/nakultt/QRSnip/releases/latest) and run it. Installs for your account without admin rights, adds QRSnip to Start and *Installed apps*, and updates itself. Until the installer is code-signed, Windows SmartScreen may warn the first time: choose *More info › Run anyway*. |
 | **Microsoft Store** | Coming soon. |
-| **Portable** | Download `QRSnip-<version>-win-x64-portable.zip` (or `arm64`) from [Releases](https://github.com/nakultt/QRSnip/releases/latest), unzip anywhere and run `QRSnip.exe`. No install or runtime needed. |
+| **Portable** | Download `QRSnip-<version>-win-x64-portable.zip` (or `arm64`) from [Releases](https://github.com/nakultt/QRSnip/releases/latest), unzip anywhere and run `QRSnip.exe`. No install or runtime needed. QRSnip tells you when a new version is out. |
 
 Requires Windows 10 version 2004 (build 19041) or later, x64 or ARM64.
 
@@ -63,7 +65,7 @@ You can also start a scan from a shortcut or script with `QRSnip.exe --scan` (`q
 
 ## Privacy
 
-QRSnip works entirely offline. Screen captures are kept in memory only while you select an area and are never saved or sent anywhere. Scan history and settings are stored locally in `%LOCALAPPDATA%\QRSnip` and can be cleared or turned off in Settings. Links open only when you click **Open link**. See [PRIVACY.md](PRIVACY.md).
+QRSnip works offline; its only network request is the daily update check, which you can turn off. Screen captures are kept in memory only while you select an area and are never saved or sent anywhere. Scan history and settings are stored locally in `%LOCALAPPDATA%\QRSnip` and can be cleared or turned off in Settings. Links open only when you click **Open link**. See [PRIVACY.md](PRIVACY.md).
 
 ## Build from source
 
@@ -80,7 +82,7 @@ dotnet test --project tests/QRSnip.Core.Tests
 dotnet build src/QRSnip -c Debug -p:Platform=x64 -p:Portable=true
 ./src/QRSnip/bin/x64/Debug/net10.0-windows10.0.26100.0/win-x64/QRSnip.exe
 
-# Release artifacts: portable zips + Store bundle in ./artifacts
+# Release artifacts in ./artifacts: portable zips, GitHub installer + update feed, Store bundle
 ./build/package.ps1
 ```
 
@@ -99,7 +101,7 @@ Built with WinUI 3 / Windows App SDK 2.x on .NET 10, using [ZXing.Net](https://g
 ## Releasing
 
 1. Bump `Version` in `Directory.Build.props` and `Identity/@Version` in `src/QRSnip/Package.appxmanifest`, and update [CHANGELOG.md](CHANGELOG.md).
-2. Publish a GitHub release tagged `vX.Y.Z`. The [release workflow](.github/workflows/release.yml) builds and tests, attaches the portable zips, and submits the update to the Microsoft Store with the changelog as *What's new*. Store setup is described in [docs/PUBLISHING.md](docs/PUBLISHING.md).
+2. Publish a GitHub release tagged `vX.Y.Z`. The [release workflow](.github/workflows/release.yml) builds and tests, attaches the portable zips, the installers and their update feed (installed copies update from it), and submits the update to the Microsoft Store with the changelog as *What's new*. Store setup is described in [docs/PUBLISHING.md](docs/PUBLISHING.md).
 
 ## Roadmap
 

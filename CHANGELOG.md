@@ -4,6 +4,25 @@ All notable changes to QRSnip are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- Windows 11 style notification-area menu with your last three scans (Open, Copy, Copy password), and a setting to make a left-click start a scan.
+- A one-time notice the first time the window is closed while QRSnip keeps running in the background.
+- In-app updates: Settings shows the version and where it came from, with **Check for updates** and *Automatically check for updates* (at most once a day). Store installs update through the Store, the new GitHub installer updates itself, and portable copies link to the download.
+- GitHub installer (`QRSnipApp-win-x64-Setup.exe` / `arm64`): per-user, no admin rights, Start menu entry, uninstall from *Installed apps*.
+- **Quit QRSnip** in Settings.
+
+### Fixed
+
+- The cursor no longer flickers while dragging a selection (#1).
+- Sharper notification-area icon at every display scaling, with a variant for light taskbars.
+
+### Changed
+
+- QRSnip releases its window and trims memory while it waits in the notification area.
+
 ## [1.0.0] - 2026-10-20
 
 First release.

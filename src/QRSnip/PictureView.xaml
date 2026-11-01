@@ -20,7 +20,7 @@
             <StackPanel x:Name="Sections" Padding="20,4,20,20" Spacing="20" />
         </ScrollViewer>
 
-        <StackPanel x:Name="Loading" Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12" Visibility="Collapsed">
+        <StackPanel x:Name="LoadingPanel" Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12" Visibility="Collapsed">
             <ProgressRing HorizontalAlignment="Center" IsActive="True" />
             <TextBlock x:Name="LoadingText" HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="Reading picture…" />
         </StackPanel>

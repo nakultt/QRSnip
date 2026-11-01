@@ -260,7 +260,7 @@ public sealed partial class CameraView : UserControl
                 StrokeLineJoin = PenLineJoin.Round,
                 Fill = new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(0x33, 0xFF, 0xFF, 0xFF)),
             };
-            Highlight.Children.Add(_outline);
+            OutlineLayer.Children.Add(_outline);
         }
 
         _outline.Points = points;

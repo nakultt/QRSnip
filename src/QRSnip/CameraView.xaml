@@ -35,7 +35,7 @@
 
         <Grid x:Name="PreviewHost" Grid.Row="1" Background="Black" CornerRadius="{StaticResource OverlayCornerRadius}" SizeChanged="OnPreviewSizeChanged">
             <MediaPlayerElement x:Name="Preview" AreTransportControlsEnabled="False" AutoPlay="True" RenderTransformOrigin="0.5,0.5" Stretch="Uniform" />
-            <Canvas x:Name="Highlight" IsHitTestVisible="False" />
+            <Canvas x:Name="OutlineLayer" IsHitTestVisible="False" />
 
             <!--  The scan frame: a guide, codes are read anywhere in the picture.  -->
             <Border x:Name="ScanFrame" HorizontalAlignment="Center" VerticalAlignment="Center" BorderBrush="White" BorderThickness="2" CornerRadius="16" IsHitTestVisible="False" Opacity="0.85" />

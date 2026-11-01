@@ -35,7 +35,7 @@ public sealed partial class PictureView : UserControl
         var cancel = _cancel = new CancellationTokenSource();
         var token = cancel.Token;
         Heading.Text = sources.Count == 1 ? sources[0].Name : $"{sources.Count} pictures";
-        Loading.Visibility = Visibility.Visible;
+        LoadingPanel.Visibility = Visibility.Visible;
 
         try
         {
@@ -81,7 +81,7 @@ public sealed partial class PictureView : UserControl
         {
             if (_cancel == cancel)
             {
-                Loading.Visibility = Visibility.Collapsed;
+                LoadingPanel.Visibility = Visibility.Collapsed;
             }
         }
     }

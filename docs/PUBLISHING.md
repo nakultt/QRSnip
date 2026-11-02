@@ -25,12 +25,19 @@ the build is ready; these steps need your Partner Center account.
 2. **Reserve the name.** In [Partner Center](https://partner.microsoft.com/dashboard/apps-and-games/overview)
    choose **Apps and games › New product › MSIX or PWA app** and reserve **QRSnip**.
    If it's taken, try *QRSnip: Screen QR Scanner* and update `DisplayName` in the manifest to match.
-3. **Copy the identity.** Open **Product management › Product identity** and copy:
-   - `Package/Identity/Name` (e.g. `12345NakulT.QRSnip`)
-   - `Package/Identity/Publisher` (e.g. `CN=1A2B3C4D-...`)
-   - `Package/Properties/PublisherDisplayName`
-4. Paste them into [`src/QRSnip/Package.appxmanifest`](../src/QRSnip/Package.appxmanifest),
-   replacing the placeholders `NakulT.QRSnip`, `CN=Nakul T` and `Nakul T`. Commit the change.
+3. **Copy the identity.** Open **Product management › Product identity** and copy
+   `Package/Identity/Name`, `Package/Identity/Publisher` and `Package/Properties/PublisherDisplayName`.
+4. Paste them into [`src/QRSnip/Package.appxmanifest`](../src/QRSnip/Package.appxmanifest) and commit.
+
+   ✅ Done for QRSnip. The manifest uses the reserved identity:
+
+   | Field | Value |
+   |---|---|
+   | Store ID | `9NSSPZM48DSR` |
+   | `Identity/Name` | `NakulT.QRSnip` |
+   | `Identity/Publisher` | `CN=945D7B2F-F832-490D-B1E0-F9297D5F227C` |
+   | `PublisherDisplayName` | `Nakul T` |
+   | Package family name | `NakulT.QRSnip_qpbc62z0nzv2y` |
 
 ### Before the first submission: check the packaged build
 

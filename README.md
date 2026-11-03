@@ -12,6 +12,8 @@
 ![Windows 10 | 11](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?logo=windows11&logoColor=white)
 ![WinUI 3](https://img.shields.io/badge/WinUI-3-5C2D91)
 
+<a href="https://apps.microsoft.com/detail/9NSSPZM48DSR?mode=direct"><img src="https://get.microsoft.com/images/en-us%20dark.svg" width="200" alt="Get it from Microsoft" /></a>
+
 <img src="docs/images/scan-result.png" width="820" alt="QRSnip showing a decoded link next to the selected QR code" />
 
 </div>
@@ -43,7 +45,8 @@ QR codes show up everywhere on a PC: in slides, PDFs, video calls, web pages and
 
 | | |
 |---|---|
-| **Microsoft Store** | Coming soon. |
+| **Microsoft Store** (recommended) | [Get QRSnip from the Microsoft Store](https://apps.microsoft.com/detail/9NSSPZM48DSR). Free, signed by Microsoft, installs without warnings and updates automatically. |
+| **winget** | `winget install 9NSSPZM48DSR` (installs the Store version) |
 | **Portable** | Download `QRSnip-<version>-win-x64-portable.zip` (or `arm64`) from [Releases](https://github.com/nakultt/QRSnip/releases/latest), unzip anywhere and run `QRSnip.exe`. No install or runtime needed. |
 
 Requires Windows 10 version 2004 (build 19041) or later, x64 or ARM64.

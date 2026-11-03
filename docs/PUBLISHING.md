@@ -1,8 +1,11 @@
 # Publishing QRSnip to the Microsoft Store
 
 QRSnip ships to the Store as an MSIX bundle (x64 + ARM64). The Store signs the
-package, so you don't need a code-signing certificate. Everything in the build is
-ready; these steps need your Partner Center account.
+package, so you don't need a code-signing certificate.
+
+> **Status:** v1.0.0 is live at <https://apps.microsoft.com/detail/9NSSPZM48DSR>
+> (published 2 November 2026). Sections 1–3 are done; they are kept as a record and for
+> reference. For new versions, see [Updating (automated)](#updating-automated).
 
 ## 1. One-time setup
 
@@ -25,6 +28,8 @@ ready; these steps need your Partner Center account.
    | `Identity/Publisher` | `CN=945D7B2F-F832-490D-B1E0-F9297D5F227C` |
    | `PublisherDisplayName` | `Nakul T` |
    | Package family name | `NakulT.QRSnip_qpbc62z0nzv2y` |
+   | Web Store URL | <https://apps.microsoft.com/detail/9NSSPZM48DSR> |
+   | Store deep link (opens the Store app) | `ms-windows-store://pdp/?productid=9NSSPZM48DSR` |
 
 ## 2. Build the upload package
 

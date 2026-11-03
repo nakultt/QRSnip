@@ -125,5 +125,14 @@ msstore submission rollout halt <ProductId>       # stop it
 ### Manual fallback
 
 Build the bundle with `./build/package.ps1 -SkipPortable` (or download it from the workflow's
-`qrsnip-packages` artifact). Then, in Partner Center, choose **Start update**, replace the
-package, update *What's new*, and submit.
+`qrsnip-packages` artifact). Then, in Partner Center › QRSnip:
+
+1. Open the **Product update: In draft** card (it is created automatically from the live
+   submission; there is no separate *Start update* button in the current layout). If no draft
+   exists, create one from the product overview.
+2. **Packages:** remove the old package and upload the new `.msixupload`.
+3. **Store listings › English (United States):** update *What's new in this version*.
+4. **Submit for certification.**
+
+Deleting an update draft never affects the live version. Don't submit a draft that still
+contains the version that is already live.

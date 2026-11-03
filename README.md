@@ -25,7 +25,7 @@ QR codes show up everywhere on a PC: in slides, PDFs, video calls, web pages and
 ## Features
 
 - **Snip to scan.** A frozen, dimmed view of your desktop just like Snipping Tool. Drag a box, or click once to scan the whole screen.
-- **Full screen mode.** <kbd>Shift</kbd>+<kbd>F10</kbd> finds every code on every monitor at once and numbers them. Works over slideshows and full-screen video.
+- **Finds codes by itself.** The moment the screen freezes, every QR code on every monitor is outlined and numbered, so often there's nothing to drag. Works over slideshows and full-screen video.
 - **Camera.** Hold a printed code or a phone screen up to your webcam.
 - **Pictures too.** Open, drag in or paste (<kbd>Ctrl</kbd>+<kbd>V</kbd>) photos and screenshots; every code is outlined. Large phone photos work.
 - **Instant result card.** Shows next to your selection with **Open link**, **Copy** and, for Wi-Fi codes, **Copy password**.
@@ -63,7 +63,6 @@ Requires Windows 10 version 2004 (build 19041) or later, x64 or ARM64.
 | Start a scan | <kbd>F10</kbd> anywhere, **New scan** in the app, or tray icon › *Scan QR code* |
 | Scan an area | Drag a box around the code |
 | Scan a whole screen | Click once without dragging |
-| Scan every screen at once | <kbd>Shift</kbd>+<kbd>F10</kbd>, **Full screen** in the overlay, or tray icon › *Scan full screen* |
 | Pick between several codes | Click a number, or <kbd>Tab</kbd> / arrow keys |
 | Scan a picture | **Picture**, drop picture files on the window, or paste one with <kbd>Ctrl</kbd>+<kbd>V</kbd> |
 | Scan with the webcam | **Camera** on the home page, or tray icon › *Scan with camera* (`--camera`) |
@@ -71,7 +70,7 @@ Requires Windows 10 version 2004 (build 19041) or later, x64 or ARM64.
 | Copy the text | **Copy** or <kbd>Ctrl</kbd>+<kbd>C</kbd> |
 | Cancel | <kbd>Esc</kbd> or right-click |
 
-You can also start a scan from a shortcut or script with `QRSnip.exe --scan`, or `--scan-full` for full screen mode (`qrsnip --scan` when installed from the Store). The overlay remembers the last mode you used. `QRSnip.exe --file "C:\path\photo.jpg"` scans a picture; the Store version also appears in File Explorer's *Open with* menu for pictures.
+You can also start a scan from a shortcut or script with `QRSnip.exe --scan` (`qrsnip --scan` when installed from the Store). `QRSnip.exe --file "C:\path\photo.jpg"` scans a picture; the Store version also appears in File Explorer's *Open with* menu for pictures.
 
 ## Privacy
 
@@ -121,7 +120,7 @@ Planned work, in the order it will be built (see [milestones](https://github.com
 2. [#2](https://github.com/nakultt/QRSnip/issues/2) System tray and background running polish (v1.1.0)
 3. [#3](https://github.com/nakultt/QRSnip/issues/3) Installable app: Microsoft Store, winget, signed MSIX (v1.1.0)
 4. [#7](https://github.com/nakultt/QRSnip/issues/7) Check for updates and update from inside the app (v1.1.0)
-5. [#4](https://github.com/nakultt/QRSnip/issues/4) Full screen scan mode (v1.2.0)
+5. [#4](https://github.com/nakultt/QRSnip/issues/4) Find every code on screen automatically (v1.2.0)
 6. [#5](https://github.com/nakultt/QRSnip/issues/5) Scan from image files: open, drag and drop, paste (v1.2.0)
 7. [#6](https://github.com/nakultt/QRSnip/issues/6) Scan with the camera (v1.3.0)
 

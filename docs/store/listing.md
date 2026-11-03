@@ -19,7 +19,7 @@ Press F10 (or click New scan), drag a box around any QR code on your screen, and
 Perfect for QR codes in slides, PDFs, video calls, websites and chat screenshots, where your phone can't easily reach.
 
 • Snip to scan: a frozen, dimmed view of your desktop just like Snipping Tool
-• Click once to scan an entire screen, or press Shift+F10 to find every code on every monitor
+• Finds every QR code on every screen by itself the moment you press F10
 • Scan pictures too: open, drag in or paste photos and screenshots
 • Or hold a printed code up to your webcam
 • Understands links, Wi-Fi, email, phone, SMS, contacts and map locations
@@ -35,12 +35,19 @@ Free and open source: github.com/nakultt/QRSnip
 
 ## What's new in this version
 
-First release.
+Version 1.1:
+• Press F10 and QRSnip now finds every QR code on all your screens by itself; dragging still works for a specific area
+• Scan pictures: open, drag in or paste (Ctrl+V) a photo or screenshot
+• Scan printed codes with your webcam
+• Resizable window with a two-column layout when wide
+• Windows 11 style tray menu with your last scans
+• Check for updates in Settings
+• Steady crosshair while dragging, sharper tray icon
 
 ## Features (up to 20, each max 200 chars)
 
 - Drag a box around any QR code on screen to read it instantly
-- Click once to scan a whole screen, or find every code on all monitors with Shift+F10
+- Finds every QR code on all your screens automatically when you press F10
 - Open links, copy text or copy Wi-Fi passwords from the result card
 - Scan QR codes in pictures: open, drag and drop, or paste a photo or screenshot
 - Scan printed codes with your webcam

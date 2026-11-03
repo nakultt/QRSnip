@@ -11,15 +11,12 @@ internal sealed unsafe class ShellHost : IDisposable
 {
     private const string ClassName = "QRSnip.ShellHost";
     private const int HotkeyId = 0x5152;
-    private const int FullScreenHotkeyId = 0x5153;
     private const uint TrayMessage = Win32.WM_APP + 1;
     private const int MenuScan = 1;
     private const int MenuOpen = 2;
     private const int MenuExit = 3;
-    private const int MenuFullScreen = 4;
     private const uint VK_Q = 0x51;
     private const uint VK_F10 = 0x79;
-    private const uint VK_F = 0x46;
 
     private static ShellHost? s_current;
 
@@ -58,9 +55,6 @@ internal sealed unsafe class ShellHost : IDisposable
     /// <summary>The scan shortcut was pressed.</summary>
     public event EventHandler? ScanRequested;
 
-    /// <summary>The full screen scan shortcut was pressed.</summary>
-    public event EventHandler? FullScreenScanRequested;
-
     /// <summary>The tray icon was clicked with the left button.</summary>
     public event EventHandler? TrayClicked;
 
@@ -79,14 +73,6 @@ internal sealed unsafe class ShellHost : IDisposable
     /// <summary>The registered shortcut as shown to the user, or null if every candidate was taken.</summary>
     public string? Hotkey { get; private set; }
 
-    /// <summary>Choices for the full screen shortcut, in fallback order, ending with <see cref="NoHotkey"/>.</summary>
-    public static IReadOnlyList<string> FullScreenHotkeyOptions { get; } = [.. FullScreenHotkeys.Select(h => h.Text), NoHotkey];
-
-    public const string NoHotkey = "None";
-
-    /// <summary>The registered full screen shortcut, or null if turned off or every candidate was taken.</summary>
-    public string? FullScreenHotkey { get; private set; }
-
     public bool TrayVisible => _trayVisible;
 
     private static (string Text, uint Modifiers, uint Key)[] Hotkeys =>
@@ -97,26 +83,12 @@ internal sealed unsafe class ShellHost : IDisposable
         ("Ctrl + Alt + Shift + Q", Win32.MOD_CONTROL | Win32.MOD_ALT | Win32.MOD_SHIFT, VK_Q),
     ];
 
-    private static (string Text, uint Modifiers, uint Key)[] FullScreenHotkeys =>
-    [
-        ("Shift + F10", Win32.MOD_SHIFT, VK_F10),
-        ("Ctrl + Shift + F10", Win32.MOD_CONTROL | Win32.MOD_SHIFT, VK_F10),
-        ("Ctrl + Alt + Shift + F", Win32.MOD_CONTROL | Win32.MOD_ALT | Win32.MOD_SHIFT, VK_F),
-    ];
-
     /// <summary>Registers the preferred shortcut, or the first free fallback if another app owns it.</summary>
     public string? RegisterHotkey(string? preferred)
     {
         Hotkey = Register(HotkeyId, Hotkeys, preferred);
         UpdateTip();
         return Hotkey;
-    }
-
-    /// <summary>Registers the full screen shortcut (or none), with the same fallback rules.</summary>
-    public string? RegisterFullScreenHotkey(string? preferred)
-    {
-        FullScreenHotkey = preferred == NoHotkey ? Register(FullScreenHotkeyId, [], null) : Register(FullScreenHotkeyId, FullScreenHotkeys, preferred);
-        return FullScreenHotkey;
     }
 
     private string? Register(int id, (string Text, uint Modifiers, uint Key)[] candidates, string? preferred)
@@ -168,8 +140,6 @@ internal sealed unsafe class ShellHost : IDisposable
         {
             var scan = Hotkey is null ? "Scan QR code" : $"Scan QR code\t{Hotkey}";
             Win32.AppendMenu(menu, Win32.MF_STRING, MenuScan, scan);
-            var full = FullScreenHotkey is null ? "Scan full screen" : $"Scan full screen\t{FullScreenHotkey}";
-            Win32.AppendMenu(menu, Win32.MF_STRING, MenuFullScreen, full);
             Win32.AppendMenu(menu, Win32.MF_STRING, MenuOpen, "Open QRSnip");
             Win32.AppendMenu(menu, Win32.MF_SEPARATOR, 0, null);
             Win32.AppendMenu(menu, Win32.MF_STRING, MenuExit, "Exit");
@@ -181,7 +151,6 @@ internal sealed unsafe class ShellHost : IDisposable
             var handler = command switch
             {
                 MenuScan => ScanRequested,
-                MenuFullScreen => FullScreenScanRequested,
                 MenuOpen => OpenRequested,
                 MenuExit => ExitRequested,
                 _ => null,
@@ -198,7 +167,6 @@ internal sealed unsafe class ShellHost : IDisposable
     {
         ShowTrayIcon(false);
         Win32.UnregisterHotKey(_hwnd, HotkeyId);
-        Win32.UnregisterHotKey(_hwnd, FullScreenHotkeyId);
         Win32.DestroyWindow(_hwnd);
         if (_icon != 0)
         {
@@ -233,12 +201,6 @@ internal sealed unsafe class ShellHost : IDisposable
         if (msg == Win32.WM_HOTKEY && wParam == HotkeyId)
         {
             ScanRequested?.Invoke(this, EventArgs.Empty);
-            return true;
-        }
-
-        if (msg == Win32.WM_HOTKEY && wParam == FullScreenHotkeyId)
-        {
-            FullScreenScanRequested?.Invoke(this, EventArgs.Empty);
             return true;
         }
 

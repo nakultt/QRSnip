@@ -48,8 +48,6 @@ public partial class App : Application
 
     public string? Hotkey => _shell?.Hotkey;
 
-    public string? FullScreenHotkey => _shell?.FullScreenHotkey;
-
     internal UpdateService? Updates => _updates;
 
     /// <summary>An update check finished or an update became available.</summary>
@@ -66,10 +64,8 @@ public partial class App : Application
 
         _shell = new ShellHost(Path.Combine(AppContext.BaseDirectory, "Assets"));
         _shell.RegisterHotkey(Storage.Settings.Hotkey);
-        _shell.RegisterFullScreenHotkey(Storage.Settings.FullScreenHotkey);
         _shell.ShowTrayIcon(Storage.Settings.RunInBackground);
         _shell.ScanRequested += (_, _) => StartScan();
-        _shell.FullScreenScanRequested += (_, _) => StartScan(ScanMode.FullScreen);
         _shell.TrayClicked += (_, _) => OnTrayClicked();
         _shell.MenuRequested += (_, pt) => ShowTrayMenu(pt);
         _shell.OpenRequested += (_, _) => ShowMainWindow();
@@ -167,29 +163,19 @@ public partial class App : Application
         return _shell?.RegisterHotkey(preferred);
     }
 
-    /// <summary>Re-registers the full screen shortcut and returns the one actually in effect (null: none).</summary>
-    public string? ChangeFullScreenHotkey(string preferred)
-    {
-        Storage.Settings.FullScreenHotkey = preferred;
-        Storage.SaveSettings();
-        return _shell?.RegisterFullScreenHotkey(preferred);
-    }
-
     public void ShowMainWindow()
     {
         _idleTimer?.Stop();
         EnsureMainWindow().ShowAndFocus();
     }
 
-    /// <summary>Opens the capture overlay, in the last used mode unless one is given.</summary>
-    public async void StartScan(ScanMode? mode = null)
+    /// <summary>Opens the capture overlay; it finds codes on every screen by itself.</summary>
+    public async void StartScan()
     {
         if (_capture is not null || _scanStarting || _exiting)
         {
             return;
         }
-
-        var scanMode = mode ?? Storage.Settings.LastScanMode;
         var restoreMain = _mainWindow?.Visible == true;
         ScreenShot shot;
         _scanStarting = true;
@@ -223,7 +209,7 @@ public partial class App : Application
             return;
         }
 
-        _capture = new CaptureWindow(shot, Storage, scanMode);
+        _capture = new CaptureWindow(shot, Storage);
         _capture.Closed += (_, _) =>
         {
             _capture = null;
@@ -361,7 +347,6 @@ public partial class App : Application
         var items = new List<MenuFlyoutItemBase>
         {
             MenuItem("Scan QR code", "", () => StartScan(), Hotkey),
-            MenuItem("Scan full screen", "", () => StartScan(ScanMode.FullScreen), FullScreenHotkey),
             MenuItem("Scan with camera", "", OpenCamera),
             new MenuFlyoutSeparator(),
         };
@@ -502,11 +487,7 @@ public partial class App : Application
         {
             OpenCamera();
         }
-        else if (launch.FullScreen)
-        {
-            StartScan(ScanMode.FullScreen);
-        }
-        else if (launch.Scan)
+        else if (launch.Scan || launch.FullScreen) // --scan-full is kept as an alias of --scan
         {
             StartScan();
         }

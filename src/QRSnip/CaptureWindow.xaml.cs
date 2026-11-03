@@ -20,10 +20,10 @@ using WinRT.Interop;
 namespace QRSnip;
 
 /// <summary>
-/// Full-desktop overlay showing a frozen screenshot. In <see cref="ScanMode.Area"/> the user
-/// drags a box (or clicks for the whole monitor) and any codes inside it are decoded and shown
-/// in a card next to the box. In <see cref="ScanMode.FullScreen"/> every monitor is decoded at
-/// once and each code is outlined and numbered.
+/// Full-desktop overlay showing a frozen screenshot. As soon as it opens, every monitor is
+/// decoded in the background and each code found is outlined and numbered, so a single code
+/// shows its card without any dragging. The user can also drag a box (or click for the whole
+/// monitor) at any time; codes inside it are shown in a card next to the box.
 /// </summary>
 public sealed partial class CaptureWindow : Window
 {
@@ -39,8 +39,7 @@ public sealed partial class CaptureWindow : Window
     private readonly List<FrameworkElement> _chips = [];
     private readonly List<Polygon> _outlines = [];
 
-    private ScanMode _mode;
-    private IReadOnlyList<ScanResult> _found = []; // full screen results
+    private IReadOnlyList<ScanResult> _found = []; // codes found on the whole desktop
     private int _focused = -1;
     private double _scale = 1; // physical pixels per DIP
     private Point _start;
@@ -49,12 +48,12 @@ public sealed partial class CaptureWindow : Window
     private bool _busy;
     private bool _closed;
     private bool _started;
+    private bool _userActed; // the user dragged or clicked, so late automatic results are ignored
 
-    internal CaptureWindow(ScreenShot shot, AppStorage storage, ScanMode mode)
+    internal CaptureWindow(ScreenShot shot, AppStorage storage)
     {
         _shot = shot;
         _storage = storage;
-        _mode = mode;
         InitializeComponent();
         _hwnd = WindowNative.GetWindowHandle(this);
 
@@ -63,7 +62,6 @@ public sealed partial class CaptureWindow : Window
         bitmap.Invalidate();
         Shot.Source = bitmap;
         Results.ItemsSource = _results;
-        UpdateModeButtons();
 
         var presenter = OverlappedPresenter.Create();
         presenter.SetBorderAndTitleBar(false, false);
@@ -204,96 +202,24 @@ public sealed partial class CaptureWindow : Window
         if (!_started)
         {
             _started = true;
-            if (_mode == ScanMode.FullScreen)
-            {
-                _ = ScanAllAsync();
-            }
+            _ = FindCodesAsync();
         }
     }
 
-    // ---- Modes ---------------------------------------------------------------------------
+    // ---- Automatic search ------------------------------------------------------------------
 
-    private void OnAreaModeClick(object sender, RoutedEventArgs e) => SetMode(ScanMode.Area);
-
-    private void OnFullModeClick(object sender, RoutedEventArgs e) => SetMode(ScanMode.FullScreen);
-
-    private void SetMode(ScanMode mode)
+    /// <summary>
+    /// Decodes every monitor in parallel as soon as the overlay opens and outlines what it finds.
+    /// It never blocks the user: dragging or clicking meanwhile wins, and the results are dropped.
+    /// </summary>
+    private async Task FindCodesAsync()
     {
-        var changed = mode != _mode;
-        _mode = mode;
-        UpdateModeButtons();
-        Root.Focus(FocusState.Programmatic);
-        if (!changed || _busy)
-        {
-            return;
-        }
-
-        _storage.Settings.LastScanMode = mode;
-        _storage.SaveSettings();
-
-        if (mode == ScanMode.FullScreen)
-        {
-            _ = ScanAllAsync();
-        }
-        else
-        {
-            ClearMarks();
-            HideCard();
-            ShowHint("", "Drag around a QR code", "Click for whole screen · Esc to cancel", ToDip(ScreenCapture.MonitorUnderCursor()));
-        }
-    }
-
-    private void UpdateModeButtons()
-    {
-        AreaModeButton.IsChecked = _mode == ScanMode.Area;
-        FullModeButton.IsChecked = _mode == ScanMode.FullScreen;
-        if (_mode == ScanMode.FullScreen)
-        {
-            HintText.Text = "Looking for QR codes…";
-            HintSecondary.Text = "Esc to cancel";
-        }
-    }
-
-    // ---- Full screen ---------------------------------------------------------------------
-
-    /// <summary>Decodes every monitor in parallel and outlines what it finds.</summary>
-    private async Task ScanAllAsync()
-    {
-        ClearMarks();
-        HideCard();
-        Selection.Visibility = Visibility.Collapsed;
-        SizeTag.Visibility = Visibility.Collapsed;
-        DimTop.Height = DimMiddle.Height = new GridLength(0);
-        DimLeft.Width = DimCenter.Width = new GridLength(0);
         var monitor = ToDip(ScreenCapture.MonitorUnderCursor());
-        ShowHint("", "Looking for QR codes on every screen…", "Esc to cancel", monitor);
+        var found = await Task.Run(() => QrScanner.Scan(_shot.Image, _shot.MonitorRegions));
 
-        _busy = true;
-        IReadOnlyList<ScanResult> found;
-        try
+        if (_closed || _userActed || found.Count == 0)
         {
-            found = await Task.Run(() => QrScanner.Scan(_shot.Image, _shot.MonitorRegions));
-        }
-        finally
-        {
-            _busy = false;
-        }
-
-        if (_closed || _mode != ScanMode.FullScreen)
-        {
-            return;
-        }
-
-        if (found.Count == 0)
-        {
-            ShowHint("", "No QR codes on screen", "Drag to scan an area · Esc to close", monitor);
-            await Task.Delay(1600);
-            if (!_closed && _mode == ScanMode.FullScreen && _found.Count == 0 && !_dragging && !_busy)
-            {
-                CloseOnce();
-            }
-
-            return;
+            return; // nothing on screen: the default "Drag around a QR code" hint stays
         }
 
         _storage.AddToHistory(found);
@@ -302,7 +228,7 @@ public sealed partial class CaptureWindow : Window
         ShowHint(
             "",
             found.Count == 1 ? "1 QR code found" : $"{found.Count} QR codes found",
-            found.Count == 1 ? "Enter to open · Esc to close" : "Tab to switch · Enter to open · Esc to close",
+            found.Count == 1 ? "Enter to open · drag to scan another area · Esc to close" : "Click a number or Tab to switch · Enter to open · Esc to close",
             monitor);
 
         if (_storage.Settings.AutoCopy)
@@ -454,11 +380,11 @@ public sealed partial class CaptureWindow : Window
             return;
         }
 
-        if (_mode == ScanMode.FullScreen)
+        // Dragging always scans an area; drop the automatic outlines.
+        _userActed = true;
+        if (_found.Count > 0)
         {
-            // Dragging always scans an area; switch to it.
             ClearMarks();
-            SetMode(ScanMode.Area);
         }
 
         HideCard();

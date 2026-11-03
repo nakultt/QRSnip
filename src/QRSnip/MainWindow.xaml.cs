@@ -18,6 +18,7 @@ public sealed partial class MainWindow : Window
 {
     private const int WidthDip = 460;
     private const int HeightDip = 680;
+    private const double WideLayoutWidth = 820;
 
     private readonly AppStorage _storage = App.Current.Storage;
     private readonly nint _hwnd;
@@ -38,13 +39,14 @@ public sealed partial class MainWindow : Window
 
         if (AppWindow.Presenter is OverlappedPresenter presenter)
         {
-            presenter.IsMaximizable = false;
+            presenter.IsMaximizable = true;
             presenter.PreferredMinimumWidth = Scale(380);
             presenter.PreferredMinimumHeight = Scale(520);
         }
 
         AppWindow.Closing += (_, e) =>
         {
+            RememberSize();
             if (_allowClose)
             {
                 return;
@@ -54,6 +56,7 @@ public sealed partial class MainWindow : Window
             CloseRequested?.Invoke(this, EventArgs.Empty);
         };
 
+        Root.SizeChanged += (_, e) => ApplyLayout(e.NewSize.Width >= WideLayoutWidth);
         HistoryList.ItemsSource = _storage.History;
         _storage.History.CollectionChanged += OnHistoryChanged;
         App.Current.UpdateStateChanged += OnUpdateStateChanged;
@@ -95,8 +98,7 @@ public sealed partial class MainWindow : Window
         if (!_positioned)
         {
             _positioned = true;
-            AppWindow.Resize(new SizeInt32(Scale(WidthDip), Scale(HeightDip)));
-            CenterOnWorkArea();
+            RestoreSize();
         }
 
         Win32.SetDwmInt(_hwnd, Win32.DWMWA_TRANSITIONS_FORCEDISABLED, 0);
@@ -121,6 +123,7 @@ public sealed partial class MainWindow : Window
     /// <summary>Hides to the notification area; the next time it opens on the home page.</summary>
     public void Hide()
     {
+        RememberSize();
         ShowPage(Page.Home);
         AppWindow.Hide();
     }
@@ -136,6 +139,81 @@ public sealed partial class MainWindow : Window
     }
 
     private int Scale(int dip) => (int)Math.Round(dip * Win32.GetDpiForWindow(_hwnd) / 96.0);
+
+    private bool? _wide;
+
+    /// <summary>
+    /// Narrow (the default size): one column. Wide or maximized: the scan panel on the left and
+    /// recent scans on the right, so a big window doesn't just stretch one column.
+    /// </summary>
+    private void ApplyLayout(bool wide)
+    {
+        if (_wide == wide)
+        {
+            return;
+        }
+
+        _wide = wide;
+        MainColumn.Width = wide ? new GridLength(420) : new GridLength(1, GridUnitType.Star);
+        SideColumn.Width = wide ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+        HomePage.ColumnSpacing = wide ? 28 : 0;
+        HomePage.Padding = wide ? new Thickness(28, 8, 28, 16) : new Thickness(20, 4, 20, 12);
+
+        // Recent header, list and empty state move to the right-hand column when wide.
+        Place(RecentHeader, column: wide ? 1 : 0, row: wide ? 0 : 1, rowSpan: 1);
+        RecentHeader.VerticalAlignment = wide ? VerticalAlignment.Top : VerticalAlignment.Stretch;
+        RecentHeader.Margin = wide ? new Thickness(4, 0, 0, 0) : new Thickness(4, 8, 0, 0);
+        Place(HistoryList, column: wide ? 1 : 0, row: wide ? 0 : 2, rowSpan: wide ? 4 : 1);
+        HistoryList.Margin = wide ? new Thickness(-4, 40, -4, 0) : new Thickness(-4, 0, -4, 0);
+        Place(EmptyState, column: wide ? 1 : 0, row: wide ? 0 : 2, rowSpan: wide ? 4 : 1);
+        EmptyState.Margin = wide ? new Thickness(0, 120, 0, 0) : new Thickness(0, 24, 0, 0);
+
+        static void Place(FrameworkElement element, int column, int row, int rowSpan)
+        {
+            Grid.SetColumn(element, column);
+            Grid.SetRow(element, row);
+            Grid.SetRowSpan(element, rowSpan);
+        }
+    }
+
+    /// <summary>
+    /// Opens compact by default (a quick utility, like Snipping Tool); if the user resized or
+    /// maximized it before, that size is restored, clamped to the current screen.
+    /// </summary>
+    private void RestoreSize()
+    {
+        var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
+        var width = Math.Min(Scale(_storage.Settings.WindowWidth ?? WidthDip), area.Width);
+        var height = Math.Min(Scale(_storage.Settings.WindowHeight ?? HeightDip), area.Height);
+        AppWindow.Resize(new SizeInt32(width, height));
+        CenterOnWorkArea();
+
+        if (_storage.Settings.WindowMaximized && AppWindow.Presenter is OverlappedPresenter presenter)
+        {
+            presenter.Maximize();
+        }
+    }
+
+    /// <summary>Saves the window size (in DIPs) and maximized state for the next time it opens.</summary>
+    private void RememberSize()
+    {
+        if (!_positioned || AppWindow.Presenter is not OverlappedPresenter presenter
+            || presenter.State == OverlappedPresenterState.Minimized)
+        {
+            return;
+        }
+
+        var settings = _storage.Settings;
+        settings.WindowMaximized = presenter.State == OverlappedPresenterState.Maximized;
+        if (!settings.WindowMaximized)
+        {
+            var dpi = Win32.GetDpiForWindow(_hwnd) / 96.0;
+            settings.WindowWidth = (int)Math.Round(AppWindow.Size.Width / dpi);
+            settings.WindowHeight = (int)Math.Round(AppWindow.Size.Height / dpi);
+        }
+
+        _storage.SaveSettings();
+    }
 
     private void CenterOnWorkArea()
     {
@@ -238,8 +316,6 @@ public sealed partial class MainWindow : Window
         _loadingSettings = true;
         HotkeyCombo.ItemsSource ??= ShellHost.HotkeyOptions;
         HotkeyCombo.SelectedItem = App.Current.Hotkey;
-        FullScreenHotkeyCombo.ItemsSource ??= ShellHost.FullScreenHotkeyOptions;
-        FullScreenHotkeyCombo.SelectedItem = App.Current.FullScreenHotkey ?? ShellHost.NoHotkey;
         AutoCopyToggle.IsOn = _storage.Settings.AutoCopy;
         BackgroundToggle.IsOn = _storage.Settings.RunInBackground;
         TrayClickCombo.SelectedIndex = _storage.Settings.TrayClickStartsScan ? 1 : 0;
@@ -556,27 +632,6 @@ public sealed partial class MainWindow : Window
         }
 
         BuildHotkeyHint();
-    }
-
-    private void OnFullScreenHotkeyChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (_loadingSettings || FullScreenHotkeyCombo.SelectedItem is not string wanted)
-        {
-            return;
-        }
-
-        var actual = App.Current.ChangeFullScreenHotkey(wanted) ?? ShellHost.NoHotkey;
-        if (actual != wanted)
-        {
-            _loadingSettings = true;
-            FullScreenHotkeyCombo.SelectedItem = actual;
-            _loadingSettings = false;
-            FullScreenHotkeyDescription.Text = $"{wanted} is already used by another app, so {(actual == ShellHost.NoHotkey ? "no shortcut" : actual)} is active.";
-        }
-        else
-        {
-            FullScreenHotkeyDescription.Text = "Finds every QR code on every screen at once, no dragging.";
-        }
     }
 
     private async void OnStartupToggled(object sender, RoutedEventArgs e)

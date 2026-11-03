@@ -25,12 +25,16 @@ QR codes show up everywhere on a PC: in slides, PDFs, video calls, web pages and
 ## Features
 
 - **Snip to scan.** A frozen, dimmed view of your desktop just like Snipping Tool. Drag a box, or click once to scan the whole screen.
+- **Finds codes by itself.** The moment the screen freezes, every QR code on every monitor is outlined and numbered, so often there's nothing to drag. Works over slideshows and full-screen video.
+- **Camera.** Hold a printed code or a phone screen up to your webcam.
+- **Pictures too.** Open, drag in or paste (<kbd>Ctrl</kbd>+<kbd>V</kbd>) photos and screenshots; every code is outlined. Large phone photos work.
 - **Instant result card.** Shows next to your selection with **Open link**, **Copy** and, for Wi-Fi codes, **Copy password**.
 - **Understands what it reads.** Links, Wi-Fi, email, phone, SMS, contacts (vCard/MeCard) and map locations, plus plain text.
 - **Several codes at once.** Every code inside the box is decoded. Tiny and inverted (light-on-dark) codes work too.
 - **Global shortcut.** <kbd>F10</kbd> by default; switch to <kbd>Ctrl</kbd>+<kbd>F10</kbd>, <kbd>Win</kbd>+<kbd>Shift</kbd>+<kbd>Q</kbd> or <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>Q</kbd> in Settings.
 - **Lives in the tray.** Closing the window keeps the shortcut working. Optional start with Windows.
 - **History**, stored only on your device. Wi-Fi passwords are never shown in the list.
+- **Stays up to date.** Checks for a new version at most once a day and installs it in place, from the Microsoft Store or GitHub depending on where you got QRSnip.
 - **Multi-monitor and mixed-DPI aware.** Covers every display, crisp at any scaling.
 - **Native Windows 11 look.** WinUI 3, Mica, Fluent icons, light and dark theme, your accent colour.
 - Supports QR codes, plus Data Matrix, Aztec and PDF417.
@@ -47,7 +51,8 @@ QR codes show up everywhere on a PC: in slides, PDFs, video calls, web pages and
 |---|---|
 | **Microsoft Store** (recommended) | [Get QRSnip from the Microsoft Store](https://apps.microsoft.com/detail/9NSSPZM48DSR). Free, signed by Microsoft, installs without warnings and updates automatically. |
 | **winget** | `winget install 9NSSPZM48DSR` (installs the Store version) |
-| **Portable** | Download `QRSnip-<version>-win-x64-portable.zip` (or `arm64`) from [Releases](https://github.com/nakultt/QRSnip/releases/latest), unzip anywhere and run `QRSnip.exe`. No install or runtime needed. |
+| **Installer** | Download `QRSnipApp-win-x64-Setup.exe` (or `arm64`) from [Releases](https://github.com/nakultt/QRSnip/releases/latest) and run it. Installs for your account without admin rights, adds QRSnip to Start and *Installed apps*, and updates itself. Until the installer is code-signed, Windows SmartScreen may warn the first time: choose *More info › Run anyway*. |
+| **Portable** | Download `QRSnip-<version>-win-x64-portable.zip` (or `arm64`) from [Releases](https://github.com/nakultt/QRSnip/releases/latest), unzip anywhere and run `QRSnip.exe`. No install or runtime needed. QRSnip tells you when a new version is out. |
 
 Requires Windows 10 version 2004 (build 19041) or later, x64 or ARM64.
 
@@ -58,15 +63,18 @@ Requires Windows 10 version 2004 (build 19041) or later, x64 or ARM64.
 | Start a scan | <kbd>F10</kbd> anywhere, **New scan** in the app, or tray icon › *Scan QR code* |
 | Scan an area | Drag a box around the code |
 | Scan a whole screen | Click once without dragging |
+| Pick between several codes | Click a number, or <kbd>Tab</kbd> / arrow keys |
+| Scan a picture | **Picture**, drop picture files on the window, or paste one with <kbd>Ctrl</kbd>+<kbd>V</kbd> |
+| Scan with the webcam | **Camera** on the home page, or tray icon › *Scan with camera* (`--camera`) |
 | Open the link | **Open link** or <kbd>Enter</kbd> |
 | Copy the text | **Copy** or <kbd>Ctrl</kbd>+<kbd>C</kbd> |
 | Cancel | <kbd>Esc</kbd> or right-click |
 
-You can also start a scan from a shortcut or script with `QRSnip.exe --scan` (`qrsnip --scan` when installed from the Store).
+You can also start a scan from a shortcut or script with `QRSnip.exe --scan` (`qrsnip --scan` when installed from the Store). `QRSnip.exe --file "C:\path\photo.jpg"` scans a picture; the Store version also appears in File Explorer's *Open with* menu for pictures.
 
 ## Privacy
 
-QRSnip works entirely offline. Screen captures are kept in memory only while you select an area and are never saved or sent anywhere. Scan history and settings are stored locally in `%LOCALAPPDATA%\QRSnip` and can be cleared or turned off in Settings. Links open only when you click **Open link**. See [PRIVACY.md](PRIVACY.md).
+QRSnip works offline; its only network request is the daily update check, which you can turn off. Screen captures, pictures and camera frames are kept in memory only while they're used and are never saved or sent anywhere. The camera is on only while the camera view is open. Scan history and settings are stored locally in `%LOCALAPPDATA%\QRSnip` and can be cleared or turned off in Settings. Links open only when you click **Open link**. See [PRIVACY.md](PRIVACY.md).
 
 ## Build from source
 
@@ -83,7 +91,7 @@ dotnet test --project tests/QRSnip.Core.Tests
 dotnet build src/QRSnip -c Debug -p:Platform=x64 -p:Portable=true
 ./src/QRSnip/bin/x64/Debug/net10.0-windows10.0.26100.0/win-x64/QRSnip.exe
 
-# Release artifacts: portable zips + Store bundle in ./artifacts
+# Release artifacts in ./artifacts: portable zips, GitHub installer + update feed, Store bundle
 ./build/package.ps1
 ```
 
@@ -102,7 +110,7 @@ Built with WinUI 3 / Windows App SDK 2.x on .NET 10, using [ZXing.Net](https://g
 ## Releasing
 
 1. Bump `Version` in `Directory.Build.props` and `Identity/@Version` in `src/QRSnip/Package.appxmanifest`, and update [CHANGELOG.md](CHANGELOG.md).
-2. Publish a GitHub release tagged `vX.Y.Z`. The [release workflow](.github/workflows/release.yml) builds and tests, attaches the portable zips, and submits the update to the Microsoft Store with the changelog as *What's new*. Store setup is described in [docs/PUBLISHING.md](docs/PUBLISHING.md).
+2. Publish a GitHub release tagged `vX.Y.Z`. The [release workflow](.github/workflows/release.yml) builds and tests, attaches the portable zips, the installers and their update feed (installed copies update from it), and submits the update to the Microsoft Store with the changelog as *What's new*. Store setup is described in [docs/PUBLISHING.md](docs/PUBLISHING.md).
 
 ## Roadmap
 
@@ -112,7 +120,7 @@ Planned work, in the order it will be built (see [milestones](https://github.com
 2. [#2](https://github.com/nakultt/QRSnip/issues/2) System tray and background running polish (v1.1.0)
 3. [#3](https://github.com/nakultt/QRSnip/issues/3) Installable app: Microsoft Store, winget, signed MSIX (v1.1.0)
 4. [#7](https://github.com/nakultt/QRSnip/issues/7) Check for updates and update from inside the app (v1.1.0)
-5. [#4](https://github.com/nakultt/QRSnip/issues/4) Full screen scan mode (v1.2.0)
+5. [#4](https://github.com/nakultt/QRSnip/issues/4) Find every code on screen automatically (v1.2.0)
 6. [#5](https://github.com/nakultt/QRSnip/issues/5) Scan from image files: open, drag and drop, paste (v1.2.0)
 7. [#6](https://github.com/nakultt/QRSnip/issues/6) Scan with the camera (v1.3.0)
 

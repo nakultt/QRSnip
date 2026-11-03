@@ -2,6 +2,8 @@ using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.Windows.AppLifecycle;
 using QRSnip.Native;
+using QRSnip.Services;
+using Velopack;
 
 namespace QRSnip;
 
@@ -14,6 +16,15 @@ public static class Program
     public static int Main()
     {
         WinRT.ComWrappersSupport.InitializeComWrappers();
+
+        // Installer and updater hooks (GitHub installer only). They run and exit here, before
+        // the single-instance redirect. Store and sideloaded packages are updated by Windows.
+        if (!StartupService.IsPackaged)
+        {
+            VelopackApp.Build()
+                .OnBeforeUninstallFastCallback(_ => Uninstaller.CleanUp())
+                .Run();
+        }
 
         var activation = AppInstance.GetCurrent().GetActivatedEventArgs();
         var main = AppInstance.FindOrRegisterForKey(InstanceKey);

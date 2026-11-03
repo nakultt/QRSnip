@@ -53,6 +53,17 @@ internal static class StartupService
         return enabled;
     }
 
+    /// <summary>Removes the Run entry if it starts this copy of QRSnip (used when uninstalling).</summary>
+    public static void RemoveRunEntryForThisCopy()
+    {
+        using var key = Registry.CurrentUser.OpenSubKey(RunKey, writable: true);
+        if (key?.GetValue(RunValue) is string command && Environment.ProcessPath is { } exe
+            && command.Contains(exe, StringComparison.OrdinalIgnoreCase))
+        {
+            key.DeleteValue(RunValue, throwOnMissingValue: false);
+        }
+    }
+
     private static bool DetectPackage()
     {
         try

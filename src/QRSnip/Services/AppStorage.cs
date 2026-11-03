@@ -10,6 +10,15 @@ public sealed class AppSettings
     /// <summary>The global shortcut that starts a scan.</summary>
     public string Hotkey { get; set; } = "F10";
 
+    /// <summary>Main window size in DIPs, remembered when the user resizes it (null: default size).</summary>
+    public int? WindowWidth { get; set; }
+
+    /// <summary>See <see cref="WindowWidth"/>.</summary>
+    public int? WindowHeight { get; set; }
+
+    /// <summary>The main window was maximized when it was last closed.</summary>
+    public bool WindowMaximized { get; set; }
+
     /// <summary>Copy the decoded text to the clipboard as soon as a code is found.</summary>
     public bool AutoCopy { get; set; }
 
@@ -18,13 +27,35 @@ public sealed class AppSettings
 
     /// <summary>Remember scanned codes on this device.</summary>
     public bool KeepHistory { get; set; } = true;
+
+    /// <summary>A left-click on the notification-area icon starts a scan instead of opening the window.</summary>
+    public bool TrayClickStartsScan { get; set; }
+
+    /// <summary>The "QRSnip is still running" notice has been shown once.</summary>
+    public bool ShownBackgroundNotice { get; set; }
+
+    /// <summary>Look for a new version at most once a day (never during a scan).</summary>
+    public bool AutoCheckForUpdates { get; set; } = true;
+
+    /// <summary>When the last successful update check ran.</summary>
+    public DateTimeOffset? LastUpdateCheck { get; set; }
+
+    /// <summary>The newest version a notification was already shown for, so it's shown once.</summary>
+    public string? NotifiedUpdateVersion { get; set; }
+
+    /// <summary>A newer version found by the last check, so the update bar comes back after a restart.</summary>
+    public string? AvailableUpdateVersion { get; set; }
+
+    /// <summary>The camera picked last time (a MediaFrameSourceGroup id).</summary>
+    public string? CameraId { get; set; }
 }
 
 public sealed class HistoryEntry
 {
-    public required string Text { get; init; }
+    // Not 'required': the XAML compiler generates a parameterless activator for this type.
+    public string Text { get; init; } = string.Empty;
 
-    public required DateTimeOffset ScannedAt { get; init; }
+    public DateTimeOffset ScannedAt { get; init; }
 
     [JsonIgnore]
     public ContentInfo Content => _content ??= ContentClassifier.Classify(Text);
@@ -37,8 +68,14 @@ public sealed class HistoryEntry
     [JsonIgnore]
     public string Glyph => ResultPresenter.Glyph(Content.Kind);
 
+    /// <summary>The code's number on screen in full screen mode, shown in its label.</summary>
     [JsonIgnore]
-    public string KindLabel => ResultPresenter.Label(Content.Kind);
+    public int? Number { get; init; }
+
+    [JsonIgnore]
+    public string KindLabel => Number is { } n
+        ? $"{n} · {ResultPresenter.Label(Content.Kind)}"
+        : ResultPresenter.Label(Content.Kind);
 
     [JsonIgnore]
     public string OpenLabel => ResultPresenter.OpenLabel(Content.Kind);
@@ -71,15 +108,18 @@ public sealed class AppStorage
 {
     private const int MaxHistory = 100;
 
-    private readonly string _folder = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "QRSnip");
+    private readonly string _folder = DataFolder;
 
     public AppStorage()
     {
         Settings = Read(SettingsPath, StorageJson.Default.AppSettings) ?? new AppSettings();
         var items = Settings.KeepHistory ? Read(HistoryPath, StorageJson.Default.ListHistoryEntry) : null;
-        History = new ObservableCollection<HistoryEntry>(items ?? []);
+        History = new ObservableCollection<HistoryEntry>((items ?? []).Where(e => e.Text.Length > 0));
     }
+
+    /// <summary>%LOCALAPPDATA%\QRSnip (redirected into the package's own storage for Store installs).</summary>
+    public static string DataFolder { get; } = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "QRSnip");
 
     public AppSettings Settings { get; }
 

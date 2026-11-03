@@ -1,5 +1,6 @@
 using QRSnip.Core;
-using ZXing;
+
+using static QRSnip.Core.Tests.TestImages;
 
 namespace QRSnip.Core.Tests;
 
@@ -70,33 +71,72 @@ public class QrScannerTests
         Assert.Empty(QrScanner.Scan(image, new PixelRect(500, 500, 10, 10)));
     }
 
-    private static BgraImage Canvas(int width, int height)
+    [Fact]
+    public void Reports_the_outline_of_a_code_in_whole_image_pixels()
     {
-        var stride = width * 4;
-        var pixels = new byte[stride * height];
-        Array.Fill(pixels, (byte)0xF0);
-        return new BgraImage(pixels, width, height, stride);
+        var image = Canvas(800, 600);
+        var code = Stamp(image, "https://github.com/nakultt/QRSnip", x: 300, y: 150, size: 240);
+
+        var result = Assert.Single(QrScanner.Scan(image, new PixelRect(280, 130, 280, 280)));
+
+        AssertOutline(code, result.Corners);
+        Assert.Equal(code.X, result.Bounds.X, tolerance: 3);
+        Assert.Equal(code.Width, result.Bounds.Width, tolerance: 5);
     }
 
-    private static void Stamp(BgraImage image, string text, int x, int y, int size, bool invert = false)
+    [Fact]
+    public void Maps_the_outline_of_an_upscaled_tiny_code_back_to_the_screen()
     {
-        var matrix = new MultiFormatWriter().encode(
-            text,
-            BarcodeFormat.QR_CODE,
-            size,
-            size,
-            new Dictionary<EncodeHintType, object> { [EncodeHintType.MARGIN] = 1 });
+        var image = Canvas(200, 200);
+        var code = Stamp(image, "tiny", x: 60, y: 60, size: 40);
 
-        for (var my = 0; my < matrix.Height; my++)
-        {
-            for (var mx = 0; mx < matrix.Width; mx++)
-            {
-                var dark = matrix[mx, my] ^ invert;
-                var value = dark ? (byte)0x10 : (byte)0xFF;
-                var p = ((y + my) * image.Stride) + ((x + mx) * 4);
-                image.Pixels[p] = image.Pixels[p + 1] = image.Pixels[p + 2] = value;
-                image.Pixels[p + 3] = 0xFF;
-            }
-        }
+        var result = Assert.Single(QrScanner.Scan(image, new PixelRect(50, 50, 60, 60)));
+
+        AssertOutline(code, result.Corners, tolerance: 2);
+    }
+
+    [Fact]
+    public void Reports_an_outline_for_each_of_several_codes()
+    {
+        var image = Canvas(900, 400);
+        var first = Stamp(image, "first", x: 40, y: 60, size: 260);
+        var second = Stamp(image, "second", x: 520, y: 60, size: 220);
+
+        var results = QrScanner.Scan(image).ToDictionary(r => r.Text);
+
+        AssertOutline(first, results["first"].Corners);
+        AssertOutline(second, results["second"].Corners);
+    }
+
+    [Fact]
+    public void Outlines_inverted_codes()
+    {
+        var image = Canvas(400, 400);
+        var code = Stamp(image, "inverted", x: 80, y: 80, size: 240, invert: true);
+
+        AssertOutline(code, Assert.Single(QrScanner.Scan(image)).Corners);
+    }
+
+    [Fact]
+    public void Scans_regions_in_parallel_and_keeps_whole_image_positions()
+    {
+        // Two "monitors" side by side, each with a code, plus one code shown on both.
+        var image = Canvas(1600, 500);
+        var left = Stamp(image, "left monitor", x: 100, y: 100, size: 250);
+        var right = Stamp(image, "right monitor", x: 1200, y: 150, size: 250);
+        Stamp(image, "same", x: 450, y: 100, size: 200);
+        Stamp(image, "same", x: 850, y: 100, size: 200);
+
+        var results = QrScanner.Scan(image, [new PixelRect(0, 0, 800, 500), new PixelRect(800, 0, 800, 500)]);
+
+        Assert.Equal(["left monitor", "right monitor", "same"], results.Select(r => r.Text).Order().ToArray());
+        AssertOutline(left, results.Single(r => r.Text == "left monitor").Corners);
+        AssertOutline(right, results.Single(r => r.Text == "right monitor").Corners);
+    }
+
+    [Fact]
+    public void Bounds_are_empty_without_corners()
+    {
+        Assert.True(new ScanResult("x", "QR_CODE").Bounds.IsEmpty);
     }
 }

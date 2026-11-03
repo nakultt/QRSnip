@@ -25,3 +25,26 @@ jobs:
         run: |
           dotnet build src/QRSnip/QRSnip.csproj -c Release -p:Platform=x64
           dotnet build src/QRSnip/QRSnip.csproj -c Release -p:Platform=ARM64
+
+  # Builds the x64 GitHub installer and portable zip the way a release does, so packaging
+  # problems show up before release day. The artifact lets reviewers try the build.
+  installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Package (x64 installer and portable zip)
+        shell: pwsh
+        run: ./build/package.ps1 -Output artifacts -Architectures x64 -SkipStore
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: qrsnip-x64-preview
+          path: |
+            artifacts/*.zip
+            artifacts/velopack/win-x64/*Setup.exe
+          retention-days: 7

@@ -18,6 +18,7 @@ CARD_TOP, CARD_BOTTOM, CARD_EDGE = (255, 255, 255), (226, 232, 241), (176, 188, 
 INK_TOP, INK_BOTTOM = (46, 64, 99), (16, 28, 52)
 BRACKET_TOP, BRACKET_BOTTOM = (91, 206, 255), (0, 95, 210)
 SCAN_LEFT, SCAN_RIGHT = (120, 240, 255), (60, 170, 255)
+TRAY_EDGE_LIGHT = (96, 108, 128)
 
 
 def vgradient(w: int, h: int, top, bottom) -> Image.Image:
@@ -53,7 +54,8 @@ def shadow(canvas: Image.Image, mask: Image.Image, big: int, dy: float, blur: fl
     canvas.alpha_composite(layer, (0, round(big * dy)))
 
 
-def logo(size: int) -> Image.Image:
+def logo(size: int, edge=CARD_EDGE) -> Image.Image:
+    """The app logo. At 24 px and below a simplified drawing keeps it legible."""
     big = size * SS
     u = lambda v: v * big  # noqa: E731 - unit to pixels
     simple = size <= 24
@@ -70,8 +72,8 @@ def logo(size: int) -> Image.Image:
     card = (0.17, 0.14, 0.83, 0.80) if not simple else (0.14, 0.12, 0.86, 0.84)
     card_mask = rect_mask([card], 0.09)
     shadow(canvas, card_mask, big, 0.025, 0.035, 90)
-    edge = rect_mask([card], 0.09)
-    fill(canvas, edge, vgradient(big, big, CARD_EDGE, CARD_EDGE))
+    edge_mask = rect_mask([card], 0.09)
+    fill(canvas, edge_mask, vgradient(big, big, edge, edge))
     inset = 0.012 if not simple else 0.03
     inner = rect_mask([(card[0] + inset, card[1] + inset, card[2] - inset, card[3] - inset)], 0.08)
     fill(canvas, inner, vgradient(big, big, CARD_TOP, CARD_BOTTOM))
@@ -147,6 +149,11 @@ def tile(width: int, height: int, mark: float) -> Image.Image:
     return img
 
 
+def save_ico(path: Path, sizes, edge=CARD_EDGE):
+    frames = [logo(s, edge) for s in sizes]
+    frames[-1].save(path, sizes=[(s, s) for s in sizes], append_images=frames[:-1])
+
+
 def main():
     ASSETS.mkdir(parents=True, exist_ok=True)
     DOCS.mkdir(parents=True, exist_ok=True)
@@ -173,8 +180,15 @@ def main():
     # Unqualified copy for use inside the app UI.
     logo(256).save(ASSETS / "AppLogo.png")
 
+    # Every frame is drawn at its own size, so 16-24 px use the simplified logo.
     sizes = [16, 20, 24, 32, 40, 48, 64, 128, 256]
-    logo(256).save(ASSETS / "AppIcon.ico", sizes=[(s, s) for s in sizes])
+    save_ico(ASSETS / "AppIcon.ico", sizes)
+
+    # Notification-area icons, one per taskbar mode. The card's edge is darker on a light
+    # taskbar so its outline doesn't disappear. ShellHost loads the exact size for the DPI.
+    tray = [16, 20, 24, 32, 40, 48, 64]
+    save_ico(ASSETS / "TrayIcon-dark.ico", tray)
+    save_ico(ASSETS / "TrayIcon-light.ico", tray, edge=TRAY_EDGE_LIGHT)
 
     logo(300).save(DOCS / "logo-300.png")  # Store listing / README
     logo(1024).save(DOCS / "logo-1024.png")

@@ -17,18 +17,22 @@ internal sealed unsafe class ShellHost : IDisposable
     private const int MenuExit = 3;
     private const uint VK_Q = 0x51;
     private const uint VK_F10 = 0x79;
-    private const int SM_CXSMICON = 49;
 
     private static ShellHost? s_current;
 
     private readonly nint _hwnd;
     private readonly uint _taskbarCreatedMessage;
-    private readonly nint _icon;
+    private readonly string _assets;
+    private nint _icon;
+    private int _iconSize;
+    private bool _iconLight;
     private bool _trayVisible;
 
-    public ShellHost(string iconPath)
+    /// <param name="assets">Folder with TrayIcon-dark.ico / TrayIcon-light.ico (AppIcon.ico as a fallback).</param>
+    public ShellHost(string assets)
     {
         s_current = this;
+        _assets = assets;
         var instance = Win32.GetModuleHandle(0);
 
         fixed (char* name = ClassName)
@@ -45,15 +49,22 @@ internal sealed unsafe class ShellHost : IDisposable
 
         _hwnd = Win32.CreateWindowEx(Win32.WS_EX_TOOLWINDOW, ClassName, "QRSnip", Win32.WS_POPUP, 0, 0, 0, 0, 0, 0, instance, 0);
         _taskbarCreatedMessage = Win32.RegisterWindowMessage("TaskbarCreated");
-
-        var size = Win32.GetSystemMetrics(SM_CXSMICON);
-        _icon = Win32.LoadImage(0, iconPath, Win32.IMAGE_ICON, size, size, Win32.LR_LOADFROMFILE);
+        LoadIcon();
     }
 
+    /// <summary>The scan shortcut was pressed.</summary>
     public event EventHandler? ScanRequested;
 
+    /// <summary>The tray icon was clicked with the left button.</summary>
+    public event EventHandler? TrayClicked;
+
+    /// <summary>The tray icon was right-clicked; the argument is the cursor position in screen pixels.</summary>
+    public event EventHandler<Win32.POINT>? MenuRequested;
+
+    /// <summary>"Open QRSnip" was chosen in the classic menu.</summary>
     public event EventHandler? OpenRequested;
 
+    /// <summary>"Exit" was chosen in the classic menu.</summary>
     public event EventHandler? ExitRequested;
 
     /// <summary>Shortcuts the user can pick from, in fallback order. F10 is the default, like Print Screen for Snipping Tool.</summary>
@@ -61,6 +72,8 @@ internal sealed unsafe class ShellHost : IDisposable
 
     /// <summary>The registered shortcut as shown to the user, or null if every candidate was taken.</summary>
     public string? Hotkey { get; private set; }
+
+    public bool TrayVisible => _trayVisible;
 
     private static (string Text, uint Modifiers, uint Key)[] Hotkeys =>
     [
@@ -73,17 +86,23 @@ internal sealed unsafe class ShellHost : IDisposable
     /// <summary>Registers the preferred shortcut, or the first free fallback if another app owns it.</summary>
     public string? RegisterHotkey(string? preferred)
     {
-        Win32.UnregisterHotKey(_hwnd, HotkeyId);
-        var ordered = Hotkeys.OrderBy(h => h.Text == preferred ? 0 : 1);
-        foreach (var (text, modifiers, key) in ordered)
+        Hotkey = Register(HotkeyId, Hotkeys, preferred);
+        UpdateTip();
+        return Hotkey;
+    }
+
+    private string? Register(int id, (string Text, uint Modifiers, uint Key)[] candidates, string? preferred)
+    {
+        Win32.UnregisterHotKey(_hwnd, id);
+        foreach (var (text, modifiers, key) in candidates.OrderBy(h => h.Text == preferred ? 0 : 1))
         {
-            if (Win32.RegisterHotKey(_hwnd, HotkeyId, modifiers | Win32.MOD_NOREPEAT, key))
+            if (Win32.RegisterHotKey(_hwnd, id, modifiers | Win32.MOD_NOREPEAT, key))
             {
-                return Hotkey = text;
+                return text;
             }
         }
 
-        return Hotkey = null;
+        return null;
     }
 
     public void ShowTrayIcon(bool visible)
@@ -97,6 +116,53 @@ internal sealed unsafe class ShellHost : IDisposable
         _trayVisible = Win32.Shell_NotifyIcon(visible ? Win32.NIM_ADD : Win32.NIM_DELETE, data) && visible;
     }
 
+    /// <summary>A classic notification balloon (shown as a toast on Windows 10/11). Needs the tray icon.</summary>
+    public bool ShowBalloon(string title, string text)
+    {
+        if (!_trayVisible)
+        {
+            return false;
+        }
+
+        var data = CreateIconData();
+        data.uFlags |= Win32.NIF_INFO;
+        data.dwInfoFlags = Win32.NIIF_USER | Win32.NIIF_LARGE_ICON;
+        title.AsSpan(0, Math.Min(title.Length, 63)).CopyTo(new Span<char>(data.szInfoTitle, 64));
+        text.AsSpan(0, Math.Min(text.Length, 255)).CopyTo(new Span<char>(data.szInfo, 256));
+        return Win32.Shell_NotifyIcon(Win32.NIM_MODIFY, data);
+    }
+
+    /// <summary>The plain Win32 menu, used if the Windows 11 style menu can't be shown.</summary>
+    public void ShowClassicMenu(Win32.POINT pt)
+    {
+        var menu = Win32.CreatePopupMenu();
+        try
+        {
+            var scan = Hotkey is null ? "Scan QR code" : $"Scan QR code\t{Hotkey}";
+            Win32.AppendMenu(menu, Win32.MF_STRING, MenuScan, scan);
+            Win32.AppendMenu(menu, Win32.MF_STRING, MenuOpen, "Open QRSnip");
+            Win32.AppendMenu(menu, Win32.MF_SEPARATOR, 0, null);
+            Win32.AppendMenu(menu, Win32.MF_STRING, MenuExit, "Exit");
+
+            Win32.SetForegroundWindow(_hwnd);
+            var command = Win32.TrackPopupMenuEx(menu, Win32.TPM_RETURNCMD | Win32.TPM_RIGHTBUTTON | Win32.TPM_BOTTOMALIGN, pt.X, pt.Y, _hwnd, 0);
+            Win32.PostMessage(_hwnd, Win32.WM_NULL, 0, 0);
+
+            var handler = command switch
+            {
+                MenuScan => ScanRequested,
+                MenuOpen => OpenRequested,
+                MenuExit => ExitRequested,
+                _ => null,
+            };
+            handler?.Invoke(this, EventArgs.Empty);
+        }
+        finally
+        {
+            Win32.DestroyMenu(menu);
+        }
+    }
+
     public void Dispose()
     {
         ShowTrayIcon(false);
@@ -105,6 +171,7 @@ internal sealed unsafe class ShellHost : IDisposable
         if (_icon != 0)
         {
             Win32.DestroyIcon(_icon);
+            _icon = 0;
         }
 
         s_current = null;
@@ -142,11 +209,12 @@ internal sealed unsafe class ShellHost : IDisposable
             switch ((uint)(lParam & 0xFFFF))
             {
                 case Win32.WM_LBUTTONUP:
-                    OpenRequested?.Invoke(this, EventArgs.Empty);
+                    TrayClicked?.Invoke(this, EventArgs.Empty);
                     break;
                 case Win32.WM_RBUTTONUP:
                 case Win32.WM_CONTEXTMENU:
-                    ShowMenu();
+                    Win32.GetCursorPos(out var pt);
+                    MenuRequested?.Invoke(this, pt);
                     break;
             }
 
@@ -155,43 +223,69 @@ internal sealed unsafe class ShellHost : IDisposable
 
         if (msg == _taskbarCreatedMessage && _trayVisible)
         {
-            // Explorer restarted: the icon is gone, add it again.
+            // Explorer restarted (or the taskbar moved to a monitor with another DPI): add the icon again.
+            LoadIcon();
             _trayVisible = false;
             ShowTrayIcon(true);
             return true;
         }
 
+        if (msg is Win32.WM_DPICHANGED or Win32.WM_DISPLAYCHANGE or Win32.WM_SETTINGCHANGE)
+        {
+            RefreshIcon();
+        }
+
         return false;
     }
 
-    private void ShowMenu()
+    /// <summary>Reloads the icon if the taskbar's DPI or light/dark mode changed.</summary>
+    public void RefreshIcon()
     {
-        var menu = Win32.CreatePopupMenu();
-        try
+        if (LoadIcon() && _trayVisible)
         {
-            var scan = Hotkey is null ? "Scan QR code" : $"Scan QR code\t{Hotkey}";
-            Win32.AppendMenu(menu, Win32.MF_STRING, MenuScan, scan);
-            Win32.AppendMenu(menu, Win32.MF_STRING, MenuOpen, "Open QRSnip");
-            Win32.AppendMenu(menu, Win32.MF_SEPARATOR, 0, null);
-            Win32.AppendMenu(menu, Win32.MF_STRING, MenuExit, "Exit");
-
-            Win32.GetCursorPos(out var pt);
-            Win32.SetForegroundWindow(_hwnd);
-            var command = Win32.TrackPopupMenuEx(menu, Win32.TPM_RETURNCMD | Win32.TPM_RIGHTBUTTON | Win32.TPM_BOTTOMALIGN, pt.X, pt.Y, _hwnd, 0);
-            Win32.PostMessage(_hwnd, Win32.WM_NULL, 0, 0);
-
-            var handler = command switch
-            {
-                MenuScan => ScanRequested,
-                MenuOpen => OpenRequested,
-                MenuExit => ExitRequested,
-                _ => null,
-            };
-            handler?.Invoke(this, EventArgs.Empty);
+            Win32.Shell_NotifyIcon(Win32.NIM_MODIFY, CreateIconData());
         }
-        finally
+    }
+
+    /// <summary>Loads the tray icon at the taskbar's exact size, so it stays crisp at any scaling.</summary>
+    private bool LoadIcon()
+    {
+        var tray = Win32.FindWindow("Shell_TrayWnd", null);
+        var dpi = tray != 0 ? Win32.GetDpiForWindow(tray) : 0;
+        if (dpi == 0)
         {
-            Win32.DestroyMenu(menu);
+            dpi = Win32.GetDpiForSystem();
+        }
+
+        var size = Win32.GetSystemMetricsForDpi(Win32.SM_CXSMICON, dpi);
+        var light = SystemTheme.TaskbarUsesLightTheme();
+        if (_icon != 0 && size == _iconSize && light == _iconLight)
+        {
+            return false;
+        }
+
+        var themed = Path.Combine(_assets, light ? "TrayIcon-light.ico" : "TrayIcon-dark.ico");
+        var path = File.Exists(themed) ? themed : Path.Combine(_assets, "AppIcon.ico");
+        var icon = Win32.LoadImage(0, path, Win32.IMAGE_ICON, size, size, Win32.LR_LOADFROMFILE);
+        if (icon == 0)
+        {
+            return false;
+        }
+
+        if (_icon != 0)
+        {
+            Win32.DestroyIcon(_icon);
+        }
+
+        (_icon, _iconSize, _iconLight) = (icon, size, light);
+        return true;
+    }
+
+    private void UpdateTip()
+    {
+        if (_trayVisible)
+        {
+            Win32.Shell_NotifyIcon(Win32.NIM_MODIFY, CreateIconData());
         }
     }
 

@@ -1,14 +1,55 @@
+using System.Runtime.InteropServices;
 using QRSnip.Core;
 using QRSnip.Native;
 
 namespace QRSnip.Services;
 
+/// <summary>One display: its handle and bounds within the screenshot (image pixels).</summary>
+internal sealed record MonitorArea(nint Handle, PixelRect Bounds);
+
 /// <summary>A frozen image of every monitor, positioned in virtual-screen coordinates.</summary>
-internal sealed record ScreenShot(BgraImage Image, int Left, int Top);
+internal sealed record ScreenShot(BgraImage Image, int Left, int Top)
+{
+    public IReadOnlyList<MonitorArea> Monitors { get; init; } = [];
+
+    /// <summary>Each monitor's bounds, for scanning them separately (the whole image if unknown).</summary>
+    public IReadOnlyList<PixelRect> MonitorRegions => Monitors.Count > 0
+        ? Monitors.Select(m => m.Bounds).ToArray()
+        : [new PixelRect(0, 0, Image.Width, Image.Height)];
+}
 
 internal static class ScreenCapture
 {
-    /// <summary>Captures the whole virtual desktop (all monitors) in physical pixels.</summary>
+    private static readonly TimeSpan FallbackTimeout = TimeSpan.FromMilliseconds(800);
+
+    [ThreadStatic]
+    private static List<(nint Handle, Win32.RECT Bounds)>? t_monitors;
+
+    /// <summary>
+    /// Captures the whole virtual desktop (all monitors) in physical pixels. Monitors that GDI
+    /// returns as solid black (hardware-accelerated or full-screen content) are captured again
+    /// with Windows.Graphics.Capture.
+    /// </summary>
+    public static async Task<ScreenShot> CaptureAsync()
+    {
+        var shot = CaptureVirtualScreen();
+        if (!GraphicsCapture.IsSupported)
+        {
+            return shot;
+        }
+
+        foreach (var monitor in shot.Monitors.Where(m => IsBlack(shot.Image, m.Bounds)))
+        {
+            if (await GraphicsCapture.CaptureMonitorAsync(monitor.Handle, FallbackTimeout) is { } frame)
+            {
+                Paste(frame, shot.Image, monitor.Bounds);
+            }
+        }
+
+        return shot;
+    }
+
+    /// <summary>Captures the whole virtual desktop (all monitors) with GDI.</summary>
     public static unsafe ScreenShot CaptureVirtualScreen()
     {
         var left = Win32.GetSystemMetrics(Win32.SM_XVIRTUALSCREEN);
@@ -49,7 +90,15 @@ internal static class ScreenCapture
                 pixels[i] = 0xFF;
             }
 
-            return new ScreenShot(new BgraImage(pixels, width, height, stride), left, top);
+            var monitors = EnumerateMonitors()
+                .Select(m => new MonitorArea(
+                    m.Handle,
+                    new PixelRect(m.Bounds.Left - left, m.Bounds.Top - top, m.Bounds.Right - m.Bounds.Left, m.Bounds.Bottom - m.Bounds.Top)
+                        .ClampTo(width, height)))
+                .Where(m => !m.Bounds.IsEmpty)
+                .ToArray();
+
+            return new ScreenShot(new BgraImage(pixels, width, height, stride), left, top) { Monitors = monitors };
         }
         finally
         {
@@ -68,8 +117,70 @@ internal static class ScreenCapture
     {
         Win32.GetCursorPos(out var point);
         var monitor = Win32.MonitorFromPoint(point, Win32.MONITOR_DEFAULTTONEAREST);
-        var info = new Win32.MONITORINFO { cbSize = (uint)System.Runtime.InteropServices.Marshal.SizeOf<Win32.MONITORINFO>() };
+        var info = new Win32.MONITORINFO { cbSize = (uint)Marshal.SizeOf<Win32.MONITORINFO>() };
         Win32.GetMonitorInfo(monitor, ref info);
         return info.rcMonitor;
+    }
+
+    private static unsafe List<(nint Handle, Win32.RECT Bounds)> EnumerateMonitors()
+    {
+        t_monitors = [];
+        try
+        {
+            Win32.EnumDisplayMonitors(0, 0, &OnMonitor, 0);
+            return t_monitors;
+        }
+        finally
+        {
+            t_monitors = null;
+        }
+    }
+
+    [UnmanagedCallersOnly]
+    private static unsafe int OnMonitor(nint monitor, nint hdc, Win32.RECT* bounds, nint data)
+    {
+        t_monitors?.Add((monitor, *bounds));
+        return 1;
+    }
+
+    /// <summary>True if a sample grid over the area is entirely (near) black.</summary>
+    private static bool IsBlack(BgraImage image, PixelRect area)
+    {
+        var step = Math.Max(8, Math.Min(area.Width, area.Height) / 64);
+        for (var y = area.Y + (step / 2); y < area.Y + area.Height; y += step)
+        {
+            var row = y * image.Stride;
+            for (var x = area.X + (step / 2); x < area.X + area.Width; x += step)
+            {
+                var p = row + (x * 4);
+                if (image.Pixels[p] > 12 || image.Pixels[p + 1] > 12 || image.Pixels[p + 2] > 12)
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private static void Paste(BgraImage source, BgraImage target, PixelRect area)
+    {
+        var width = Math.Min(source.Width, area.Width);
+        var height = Math.Min(source.Height, area.Height);
+        for (var y = 0; y < height; y++)
+        {
+            var from = source.Pixels.AsSpan(y * source.Stride, width * 4);
+            from.CopyTo(target.Pixels.AsSpan(((area.Y + y) * target.Stride) + (area.X * 4)));
+        }
+
+        // Keep the overlay's screenshot opaque, whatever alpha the capture produced.
+        for (var y = 0; y < height; y++)
+        {
+            var row = ((area.Y + y) * target.Stride) + (area.X * 4);
+            for (var x = 0; x < width; x++)
+            {
+                target.Pixels[row + (x * 4) + 3] = 0xFF;
+            }
+        }
     }
 }

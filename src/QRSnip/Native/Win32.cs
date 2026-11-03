@@ -301,6 +301,30 @@ internal static unsafe partial class Win32
 
     public const uint WM_SETCURSOR = 0x0020;
     public const int HTCLIENT = 1;
+    public const int IDC_ARROW = 32512;
+    public const int IDC_CROSS = 32515;
+    public const int GCLP_HCURSOR = -12;
+    public const int GCW_ATOM = -32;
+
+    [LibraryImport("user32.dll")]
+    public static partial nint SetCursor(nint cursor);
+
+    [LibraryImport("user32.dll", EntryPoint = "LoadCursorW")]
+    public static partial nint LoadCursor(nint instance, nint name);
+
+    [LibraryImport("user32.dll", EntryPoint = "GetClassLongPtrW")]
+    public static partial nint GetClassLongPtr(nint hwnd, int index);
+
+    [LibraryImport("user32.dll", EntryPoint = "SetClassLongPtrW")]
+    public static partial nint SetClassLongPtr(nint hwnd, int index, nint value);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool EnumChildWindows(nint parent, delegate* unmanaged<nint, nint, int> callback, nint lParam);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool IsWindow(nint hwnd);
 
     [LibraryImport("comctl32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -315,4 +339,69 @@ internal static unsafe partial class Win32
 
     public static void SetDwmInt(nint hwnd, int attribute, int value) =>
         DwmSetWindowAttribute(hwnd, attribute, value, sizeof(int));
+
+    public const uint WM_SETTINGCHANGE = 0x001A;
+    public const uint WM_DISPLAYCHANGE = 0x007E;
+    public const uint WM_DPICHANGED = 0x02E0;
+    public const uint NIF_INFO = 0x10;
+    public const uint NIIF_USER = 0x4;
+    public const uint NIIF_LARGE_ICON = 0x20;
+    public const int SM_CXSMICON = 49;
+    public const uint WS_EX_NOACTIVATE = 0x08000000;
+    public const int GWL_EXSTYLE = -20;
+
+    [LibraryImport("user32.dll")]
+    public static partial int GetSystemMetricsForDpi(int index, uint dpi);
+
+    [LibraryImport("user32.dll")]
+    public static partial uint GetDpiForSystem();
+
+    [LibraryImport("user32.dll", EntryPoint = "FindWindowW", StringMarshalling = StringMarshalling.Utf16)]
+    public static partial nint FindWindow(string? className, string? windowName);
+
+    [LibraryImport("kernel32.dll")]
+    public static partial nint GetCurrentProcess();
+
+    /// <summary>Trims the working set (psapi's EmptyWorkingSet, exported by kernel32).</summary>
+    [LibraryImport("kernel32.dll", EntryPoint = "K32EmptyWorkingSet")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool EmptyWorkingSet(nint process);
+
+    [LibraryImport("kernel32.dll", StringMarshalling = StringMarshalling.Utf16)]
+    public static partial int RegisterApplicationRestart(string? commandLine, uint flags);
+
+    [LibraryImport("user32.dll")]
+    public static partial nint GetForegroundWindow();
+
+    [LibraryImport("user32.dll")]
+    public static partial uint GetWindowThreadProcessId(nint hwnd, out uint processId);
+
+    /// <summary>True if the window belongs to this process (e.g. one of our popups).</summary>
+    public static bool IsOwnWindow(nint hwnd) =>
+        hwnd != 0 && GetWindowThreadProcessId(hwnd, out var pid) != 0 && pid == (uint)Environment.ProcessId;
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool EnumDisplayMonitors(nint hdc, nint clip, delegate* unmanaged<nint, nint, RECT*, nint, int> callback, nint data);
+
+    // Windows.Graphics.Capture interop (fallback capture for full-screen apps).
+    public const int D3D_DRIVER_TYPE_HARDWARE = 1;
+    public const int D3D_DRIVER_TYPE_WARP = 5;
+    public const uint D3D11_CREATE_DEVICE_BGRA_SUPPORT = 0x20;
+    public const uint D3D11_SDK_VERSION = 7;
+
+    [LibraryImport("d3d11.dll")]
+    public static partial int D3D11CreateDevice(nint adapter, int driverType, nint software, uint flags, nint featureLevels, uint featureLevelCount, uint sdkVersion, out nint device, out int featureLevel, out nint context);
+
+    [LibraryImport("d3d11.dll")]
+    public static partial int CreateDirect3D11DeviceFromDXGIDevice(nint dxgiDevice, out nint graphicsDevice);
+
+    [LibraryImport("combase.dll", StringMarshalling = StringMarshalling.Utf16)]
+    public static partial int WindowsCreateString(string source, int length, out nint hstring);
+
+    [LibraryImport("combase.dll")]
+    public static partial int WindowsDeleteString(nint hstring);
+
+    [LibraryImport("combase.dll")]
+    public static partial int RoGetActivationFactory(nint activatableClassId, in Guid iid, out nint factory);
 }

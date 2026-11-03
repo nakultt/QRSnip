@@ -1,7 +1,8 @@
 name: Release
 
 # Publishing a GitHub release:
-#   1. builds the portable zips and the Store bundle, and attaches the zips to the release;
+#   1. builds the portable zips, the GitHub installer with its update feed (Velopack) and the
+#      Store bundle, and attaches the zips, installers and feed to the release;
 #   2. submits the Store bundle to the Microsoft Store as an update (once configured, see
 #      docs/PUBLISHING.md). Pre-releases are never sent to the Store.
 on:
@@ -20,6 +21,9 @@ permissions:
 jobs:
   package:
     runs-on: windows-latest
+    permissions:
+      contents: write
+      id-token: write # only used to sign in to Azure for code signing, when configured
     steps:
       - uses: actions/checkout@v7
 
@@ -30,9 +34,59 @@ jobs:
       - name: Test core library
         run: dotnet test --project tests/QRSnip.Core.Tests -c Release
 
+      - name: Restore tools
+        run: dotnet tool restore
+
+      # The previous release's packages let vpk build small delta updates.
+      - name: Download previous installer release
+        if: github.event_name == 'release'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          foreach ($arch in 'x64', 'arm64') {
+            dotnet vpk download github --repoUrl "${{ github.server_url }}/${{ github.repository }}" --token $env:GH_TOKEN --channel "win-$arch" --outputDir "artifacts/velopack/win-$arch"
+            if ($LASTEXITCODE) { Write-Warning "No earlier win-$arch installer release found; publishing full packages only." }
+          }
+          exit 0
+
+      # Optional code signing with Azure Artifact Signing (formerly Trusted Signing), so the
+      # installer and QRSnip.exe don't trigger SmartScreen. Skipped until the
+      # ARTIFACT_SIGNING_ENDPOINT variable exists; see docs/PUBLISHING.md.
+      - name: Sign in to Azure
+        if: vars.ARTIFACT_SIGNING_ENDPOINT != ''
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Set up code signing
+        id: signing
+        if: vars.ARTIFACT_SIGNING_ENDPOINT != ''
+        shell: pwsh
+        env:
+          ENDPOINT: ${{ vars.ARTIFACT_SIGNING_ENDPOINT }}
+          ACCOUNT: ${{ vars.ARTIFACT_SIGNING_ACCOUNT }}
+          PROFILE: ${{ vars.ARTIFACT_SIGNING_PROFILE }}
+        run: |
+          $dir = (New-Item -ItemType Directory -Force (Join-Path $env:RUNNER_TEMP 'signing')).FullName
+          Invoke-WebRequest https://www.nuget.org/api/v2/package/Microsoft.ArtifactSigning.Client/1.0.146 -OutFile "$dir\client.zip"
+          Expand-Archive "$dir\client.zip" "$dir\client" -Force
+          @{ Endpoint = $env:ENDPOINT; CodeSigningAccountName = $env:ACCOUNT; CertificateProfileName = $env:PROFILE } |
+            ConvertTo-Json | Set-Content "$dir\metadata.json"
+          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
+            Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $signtool) { throw 'signtool.exe not found.' }
+          $template = "`"$($signtool.FullName)`" sign /fd SHA256 /tr http://timestamp.acs.microsoft.com /td SHA256 " +
+            "/dlib `"$dir\client\bin\x64\Azure.CodeSigning.Dlib.dll`" /dmdf `"$dir\metadata.json`" {{file}}"
+          "template=$template" >> $env:GITHUB_OUTPUT
+
       - name: Package
         shell: pwsh
-        run: ./build/package.ps1 -Output artifacts
+        env:
+          SIGN_TEMPLATE: ${{ steps.signing.outputs.template }}
+        run: ./build/package.ps1 -Output artifacts -SignTemplate $env:SIGN_TEMPLATE
 
       - uses: actions/upload-artifact@v7
         with:
@@ -46,6 +100,48 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         # Users get the portable zips; the .msixupload goes to the Store job below.
         run: gh release upload "${{ github.event.release.tag_name }}" (Get-ChildItem artifacts -Filter *.zip).FullName --clobber
+
+      # Setup.exe, the .nupkg packages and releases.win-<arch>.json, which installed copies
+      # check for updates. Added to the release that triggered this run.
+      - name: Publish installer and update feed
+        if: github.event_name == 'release'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+          NAME: ${{ github.event.release.name }}
+          PRERELEASE: ${{ github.event.release.prerelease }}
+        run: |
+          foreach ($arch in 'x64', 'arm64') {
+            $upload = @('vpk', 'upload', 'github',
+              '--repoUrl', "${{ github.server_url }}/${{ github.repository }}", '--token', $env:GH_TOKEN,
+              '--channel', "win-$arch", '--outputDir', "artifacts/velopack/win-$arch",
+              '--tag', $env:TAG, '--releaseName', ($env:NAME ? $env:NAME : $env:TAG), '--merge', '--publish')
+            if ($env:PRERELEASE -eq 'true') { $upload += '--pre' }
+            dotnet @upload
+            if ($LASTEXITCODE) { throw "Uploading the win-$arch installer failed." }
+          }
+
+  # Keeps `winget install NakulT.QRSnip` current. Skipped until the WINGET_PACKAGE_ID variable
+  # exists, which you add after the first manual submission (see docs/PUBLISHING.md).
+  winget:
+    needs: package
+    if: vars.WINGET_PACKAGE_ID != '' && github.event_name == 'release' && !github.event.release.prerelease
+    runs-on: windows-latest
+    steps:
+      - name: Submit the new version to winget-pkgs
+        shell: pwsh
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+          PACKAGE_ID: ${{ vars.WINGET_PACKAGE_ID }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          $version = $env:TAG.TrimStart('v')
+          $base = "${{ github.server_url }}/${{ github.repository }}/releases/download/$env:TAG"
+          Invoke-WebRequest https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
+          ./wingetcreate.exe update $env:PACKAGE_ID --version $version --submit --token $env:WINGET_TOKEN `
+            --urls "$base/QRSnipApp-win-x64-Setup.exe|x64" "$base/QRSnipApp-win-arm64-Setup.exe|arm64"
+          if ($LASTEXITCODE) { throw 'wingetcreate failed.' }
 
   store:
     needs: package

@@ -14,7 +14,7 @@
   <Identity
     Name="NakulT.QRSnip"
     Publisher="CN=945D7B2F-F832-490D-B1E0-F9297D5F227C"
-    Version="1.0.0.0" />
+    Version="1.1.0.0" />
 
   <Properties>
     <DisplayName>QRSnip</DisplayName>

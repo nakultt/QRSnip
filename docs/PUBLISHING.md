@@ -1,5 +1,10 @@
 # Publishing QRSnip
 
+> **Status:** v1.0.0 is live in the Microsoft Store at
+> <https://apps.microsoft.com/detail/9NSSPZM48DSR> (published 2 November 2026). Store sections
+> 1–3 below are done and kept for reference; for new Store versions see
+> [Updating (automated)](#updating-automated) or its [manual fallback](#manual-fallback).
+
 QRSnip ships through three channels, and each copy updates from the channel it came from
 (Windows doesn't let a Store package take an update from anywhere else):
 
@@ -38,6 +43,8 @@ the build is ready; these steps need your Partner Center account.
    | `Identity/Publisher` | `CN=945D7B2F-F832-490D-B1E0-F9297D5F227C` |
    | `PublisherDisplayName` | `Nakul T` |
    | Package family name | `NakulT.QRSnip_qpbc62z0nzv2y` |
+   | Web Store URL | <https://apps.microsoft.com/detail/9NSSPZM48DSR> |
+   | Store deep link (opens the Store app) | `ms-windows-store://pdp/?productid=9NSSPZM48DSR` |
 
 ### Before the first submission: check the packaged build
 
@@ -149,8 +156,17 @@ msstore submission rollout halt <ProductId>       # stop it
 #### Manual fallback
 
 Build the bundle with `./build/package.ps1 -SkipPortable` (or download it from the workflow's
-`qrsnip-packages` artifact). Then, in Partner Center, choose **Start update**, replace the
-package, update *What's new*, and submit.
+`qrsnip-packages` artifact). Then, in Partner Center › QRSnip:
+
+1. Open the **Product update: In draft** card (it is created automatically from the live
+   submission; there is no separate *Start update* button in the current layout). If no draft
+   exists, create one from the product overview.
+2. **Packages:** remove the old package and upload the new `.msixupload`.
+3. **Store listings › English (United States):** update *What's new in this version*.
+4. **Submit for certification.**
+
+Deleting an update draft never affects the live version. Don't submit a draft that still
+contains the version that is already live.
 
 ## GitHub installer and in-app updates
 
